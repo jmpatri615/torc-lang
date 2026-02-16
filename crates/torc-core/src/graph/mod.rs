@@ -80,6 +80,9 @@ pub enum GraphError {
         expected: String,
         found: String,
     },
+
+    #[error("merge conflict: duplicate {kind} id {id}")]
+    MergeConflict { kind: String, id: uuid::Uuid },
 }
 
 /// The core graph container for a Torc program.
@@ -738,6 +741,69 @@ impl Graph {
         } else {
             Err(all_errors)
         }
+    }
+
+    /// Merge another graph into this one.
+    ///
+    /// All node, edge, and region IDs in `other` must be disjoint from `self`.
+    /// Returns `MergeConflict` if any ID collides. On success, all nodes, edges,
+    /// regions, and indexes from `other` are copied into `self`.
+    pub fn merge(&mut self, other: &Graph) -> Result<(), GraphError> {
+        // Conflict check — scan all IDs before mutating
+        for id in other.nodes.keys() {
+            if self.nodes.contains_key(id) {
+                return Err(GraphError::MergeConflict {
+                    kind: "node".to_string(),
+                    id: *id,
+                });
+            }
+        }
+        for id in other.edges.keys() {
+            if self.edges.contains_key(id) {
+                return Err(GraphError::MergeConflict {
+                    kind: "edge".to_string(),
+                    id: *id,
+                });
+            }
+        }
+        for id in other.regions.keys() {
+            if self.regions.contains_key(id) {
+                return Err(GraphError::MergeConflict {
+                    kind: "region".to_string(),
+                    id: *id,
+                });
+            }
+        }
+
+        // Copy data
+        for (id, node) in &other.nodes {
+            self.nodes.insert(*id, node.clone());
+        }
+        for (id, edge) in &other.edges {
+            self.edges.insert(*id, edge.clone());
+        }
+        for (id, region) in &other.regions {
+            self.regions.insert(*id, region.clone());
+        }
+
+        // Merge indexes
+        for (id, edges) in &other.outgoing {
+            self.outgoing.entry(*id).or_default().extend(edges);
+        }
+        for (id, edges) in &other.incoming {
+            self.incoming.entry(*id).or_default().extend(edges);
+        }
+        for (id, children) in &other.region_children {
+            self.region_children.entry(*id).or_default().extend(children);
+        }
+        for (node_id, region_id) in &other.node_region {
+            self.node_region.insert(*node_id, *region_id);
+        }
+        for (child_id, parent_id) in &other.region_parent {
+            self.region_parent.insert(*child_id, *parent_id);
+        }
+
+        Ok(())
     }
 
     /// Validate graph well-formedness.
@@ -1553,6 +1619,154 @@ mod tests {
         assert_eq!(obs.len(), 1);
         assert_eq!(obs[0].kind, ObligationKind::Termination);
         assert!(obs[0].description.contains("Fixpoint"));
+    }
+
+    #[test]
+    fn merge_disjoint_graphs() {
+        let mut g1 = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_arithmetic_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g1.add_node(n1).unwrap();
+        g1.add_node(n2).unwrap();
+        g1.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+
+        let mut g2 = Graph::new();
+        let n3 = make_literal_node();
+        let n4 = make_literal_node();
+        let id3 = n3.id;
+        let id4 = n4.id;
+        g2.add_node(n3).unwrap();
+        g2.add_node(n4).unwrap();
+        g2.add_edge(Edge::new((id3, 0), (id4, 0))).unwrap();
+
+        g1.merge(&g2).unwrap();
+        assert_eq!(g1.node_count(), 4);
+        assert_eq!(g1.edge_count(), 2);
+    }
+
+    #[test]
+    fn merge_empty_into_populated() {
+        let mut g1 = Graph::new();
+        let n1 = make_literal_node();
+        g1.add_node(n1).unwrap();
+
+        let g2 = Graph::new();
+        g1.merge(&g2).unwrap();
+        assert_eq!(g1.node_count(), 1);
+    }
+
+    #[test]
+    fn merge_populated_into_empty() {
+        let mut g1 = Graph::new();
+
+        let mut g2 = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_literal_node();
+        g2.add_node(n1).unwrap();
+        g2.add_node(n2).unwrap();
+
+        g1.merge(&g2).unwrap();
+        assert_eq!(g1.node_count(), 2);
+    }
+
+    #[test]
+    fn merge_conflict_detected() {
+        let mut g1 = Graph::new();
+        let n1 = make_literal_node();
+        let shared_id = n1.id;
+        g1.add_node(n1).unwrap();
+
+        let mut g2 = Graph::new();
+        let n2 = Node::with_id(shared_id, NodeKind::Literal);
+        g2.add_node(n2).unwrap();
+
+        let err = g1.merge(&g2).unwrap_err();
+        assert!(matches!(err, GraphError::MergeConflict { .. }));
+    }
+
+    #[test]
+    fn merge_edge_conflict_detected() {
+        let mut g1 = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_literal_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g1.add_node(n1).unwrap();
+        g1.add_node(n2).unwrap();
+        let shared_edge = Edge::new((id1, 0), (id2, 0));
+        let shared_edge_id = shared_edge.id;
+        g1.add_edge(shared_edge).unwrap();
+
+        let mut g2 = Graph::new();
+        let n3 = make_literal_node();
+        let n4 = make_literal_node();
+        let id3 = n3.id;
+        let id4 = n4.id;
+        g2.add_node(n3).unwrap();
+        g2.add_node(n4).unwrap();
+        let dup_edge = Edge::with_id(shared_edge_id, (id3, 0), (id4, 0));
+        g2.add_edge(dup_edge).unwrap();
+
+        let err = g1.merge(&g2).unwrap_err();
+        assert!(
+            matches!(err, GraphError::MergeConflict { ref kind, .. } if kind == "edge")
+        );
+    }
+
+    #[test]
+    fn merge_region_conflict_detected() {
+        let mut g1 = Graph::new();
+        let n1 = make_literal_node();
+        let id1 = n1.id;
+        g1.add_node(n1).unwrap();
+        let r1 = Region::new(RegionKind::Sequential, vec![id1]);
+        let shared_region_id = r1.id;
+        g1.add_region(r1).unwrap();
+
+        let mut g2 = Graph::new();
+        let n2 = make_literal_node();
+        let id2 = n2.id;
+        g2.add_node(n2).unwrap();
+        let r2 = Region::with_id(shared_region_id, RegionKind::Parallel, vec![id2]);
+        g2.add_region(r2).unwrap();
+
+        let err = g1.merge(&g2).unwrap_err();
+        assert!(
+            matches!(err, GraphError::MergeConflict { ref kind, .. } if kind == "region")
+        );
+    }
+
+    #[test]
+    fn merge_preserves_region_hierarchy() {
+        let mut g1 = Graph::new();
+        let n1 = make_literal_node();
+        g1.add_node(n1).unwrap();
+
+        let mut g2 = Graph::new();
+        let n2 = make_literal_node();
+        let n3 = make_literal_node();
+        let id2 = n2.id;
+        let id3 = n3.id;
+        g2.add_node(n2).unwrap();
+        g2.add_node(n3).unwrap();
+
+        let inner = Region::new(RegionKind::Sequential, vec![id2]);
+        let inner_id = inner.id;
+        g2.add_region(inner).unwrap();
+
+        let outer = Region::new(RegionKind::Parallel, vec![id3]);
+        let outer_id = outer.id;
+        g2.add_region(outer).unwrap();
+        g2.set_region_parent(inner_id, outer_id).unwrap();
+
+        g1.merge(&g2).unwrap();
+        assert_eq!(g1.region_count(), 2);
+        assert_eq!(g1.parent_region(&inner_id), Some(&outer_id));
+        assert_eq!(g1.containing_region(&id2), Some(&inner_id));
+        // Merged graph should pass structural validation
+        assert!(g1.validate().is_ok());
     }
 
     #[test]

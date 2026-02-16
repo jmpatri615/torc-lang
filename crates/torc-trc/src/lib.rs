@@ -26,5 +26,7 @@
 //! ```
 
 mod format;
+mod merge;
 
 pub use format::{TrcError, TrcFile, TrcFlags, TrcVersion};
+pub use merge::{merge_trc_files, MergeError};
