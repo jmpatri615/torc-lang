@@ -1,0 +1,13 @@
+[package]
+name = "torc-targets"
+description = "Target platform model definitions and parsing for the Torc language"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+torc-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+toml = "0.8"

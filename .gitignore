@@ -1,0 +1,34 @@
+# Build outputs
+/target/
+/out/
+
+# Torc artifacts
+*.trc
+.torc-proofs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Rust
+**/*.rs.bk
+Cargo.lock
+
+# Testing
+/coverage/
+*.profraw
+*.profdata
+
+# Documentation build
+/docs/build/

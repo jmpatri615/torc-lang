@@ -1,0 +1,12 @@
+[package]
+name = "torc-materialize"
+description = "Materialization engine (graph-to-executable pipeline) for the Torc language"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+torc-core = { workspace = true }
+torc-verify = { workspace = true }
+torc-targets = { workspace = true }
+thiserror = { workspace = true }

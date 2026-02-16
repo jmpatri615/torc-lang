@@ -1,0 +1,13 @@
+[package]
+name = "torc-core"
+description = "Core graph data structures, type system, and contracts for the Torc language"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+uuid = { workspace = true }
+sha2 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

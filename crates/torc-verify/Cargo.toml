@@ -1,0 +1,10 @@
+[package]
+name = "torc-verify"
+description = "Verification framework and SMT solver integration for the Torc language"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+torc-core = { workspace = true }
+thiserror = { workspace = true }

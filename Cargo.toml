@@ -1,0 +1,38 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/torc-core",
+    "crates/torc-trc",
+    "crates/torc-verify",
+    "crates/torc-materialize",
+    "crates/torc-targets",
+    "crates/torc-ffi",
+    "crates/torc-observe",
+    "crates/torc-registry",
+    "cli/torc",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/torc-lang/torc"
+
+[workspace.dependencies]
+# Internal crates
+torc-core = { path = "crates/torc-core" }
+torc-trc = { path = "crates/torc-trc" }
+torc-verify = { path = "crates/torc-verify" }
+torc-materialize = { path = "crates/torc-materialize" }
+torc-targets = { path = "crates/torc-targets" }
+torc-ffi = { path = "crates/torc-ffi" }
+torc-observe = { path = "crates/torc-observe" }
+torc-registry = { path = "crates/torc-registry" }
+
+# Shared external dependencies
+uuid = { version = "1", features = ["v4", "serde"] }
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"

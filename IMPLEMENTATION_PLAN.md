@@ -1,0 +1,688 @@
+# Torc Implementation Plan
+
+**Version:** 0.1.0
+**Last Updated:** 2026-02-15
+**Status:** Phase 1 — Complete
+
+---
+
+## Overview
+
+This document tracks the implementation of the Torc programming language, ecosystem, and build system as defined in the [specification](./spec/). Implementation is organized into phases, each building on the previous. Each phase has clear deliverables and acceptance criteria.
+
+The reference implementation is written in **Rust**, chosen for its memory safety guarantees, performance characteristics, and strong ecosystem for systems programming (LLVM bindings, SMT solver bindings, binary format handling).
+
+---
+
+## Phase Summary
+
+| Phase | Name | Description | Status |
+|-------|------|-------------|--------|
+| 0 | Project Setup | Repo structure, CI, workspace layout | **In Progress** |
+| 1 | Core Graph Model | Nodes, edges, regions, basic types | **Complete** |
+| 2 | Type System | Full type universe implementation | Not Started |
+| 3 | Contract System | Contracts, predicates, proof obligations | Not Started |
+| 4 | TRC Binary Format | Serialization/deserialization of .trc files | Not Started |
+| 5 | Graph Construction API | Programmatic API for building graphs | Not Started |
+| 6 | Verification Framework | SMT integration, structural analysis, proof caching | Not Started |
+| 7 | Materialization Engine | Graph-to-executable pipeline via LLVM | Not Started |
+| 8 | Target Platform Models | ISA, microarchitecture, environment model parsing | Not Started |
+| 9 | CLI Tool (`torc`) | Unified command-line interface | Not Started |
+| 10 | Observability Layer | Projection views, pseudo-code generation | Not Started |
+| 11 | FFI Bridge | C interop (Rust interop stretch goal) | Not Started |
+| 12 | Registry Client | Package fetching and publishing | Not Started |
+| 13 | Integration & Examples | End-to-end example applications | Not Started |
+
+---
+
+## Phase 0: Project Setup
+
+**Goal:** Establish the Rust workspace, CI pipeline, and project conventions.
+
+### Tasks
+
+- [x] Initialize git repository
+- [x] Deploy specification documents to `spec/`
+- [x] Create `.gitignore`
+- [x] Create `README.md`
+- [x] Create this implementation plan
+- [x] Initialize Rust workspace (`Cargo.toml`) with member crates
+- [x] Create crate stubs for all major components
+- [ ] Set up CI (GitHub Actions: build, test, clippy, fmt)
+- [ ] Establish coding conventions (error handling patterns, naming, module structure)
+- [x] Add LICENSE file (Apache-2.0)
+
+### Crate Structure
+
+```
+torc/
+├── Cargo.toml                  # Workspace root
+├── crates/
+│   ├── torc-core/             # Graph model, types, contracts
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── graph/          # Node, Edge, Region
+│   │       ├── types/          # Type universe
+│   │       ├── contract/       # Contract model
+│   │       └── provenance/     # Provenance tracking
+│   ├── torc-trc/              # Binary format (.trc)
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   ├── torc-verify/           # Verification framework
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   ├── torc-materialize/      # Materialization engine
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   ├── torc-targets/          # Platform model parsing
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   ├── torc-ffi/              # FFI bridge generation
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   ├── torc-observe/          # Observability layer
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   └── torc-registry/         # Registry client
+│       ├── Cargo.toml
+│       └── src/
+├── cli/
+│   └── torc/                    # CLI binary
+│       ├── Cargo.toml
+│       └── src/
+├── spec/                       # Language specification
+└── tests/
+    └── integration/            # Cross-crate integration tests
+```
+
+### Acceptance Criteria
+
+- `cargo build` succeeds for all crates (even if they're mostly empty)
+- `cargo test` runs (even with zero tests)
+- `cargo clippy` passes with no warnings
+- `cargo fmt --check` passes
+
+---
+
+## Phase 1: Core Graph Model
+
+**Goal:** Implement the fundamental graph data structures — nodes, edges, and regions — as defined in spec section 3.
+
+### Tasks
+
+- [x] Define `NodeId` (UUID, content-addressed via SHA-256)
+- [x] Define `EdgeId` and `RegionId`
+- [x] Implement `NodeKind` enum with all categories:
+  - [x] Primitive computation: `Literal`, `Arithmetic`, `Bitwise`, `Comparison`, `Conversion`
+  - [x] Data structure: `Construct`, `Destructure`, `Index`, `Slice`
+  - [x] Control flow: `Select`, `Switch`, `Iterate`, `Recurse`, `Fixpoint`
+  - [x] Effect: `Allocate`, `Deallocate`, `Read`, `Write`, `Atomic`, `Fence`, `Syscall`, `FFICall`
+  - [x] Meta: `Verify`, `Assume`, `Measure`, `Checkpoint`, `Annotate`
+  - [x] Probabilistic: `Sample`, `Condition`, `Expectation`, `Entropy`, `Approximate`
+- [x] Implement `Node` struct with all fields (id, kind, contract, type_sig, provenance, annotations)
+- [x] Implement `Edge` struct (id, source, target, type, lifetime, bandwidth)
+- [x] Implement `RegionKind` enum: `Sequential`, `Parallel`, `Conditional`, `Iterative`, `Atomic`
+- [x] Implement `Region` struct (id, kind, constraints, children, interfaces)
+- [x] Implement `Port` (input/output interface points)
+- [x] Implement the `Graph` container:
+  - [x] Node storage and lookup by ID
+  - [x] Edge storage with source/target indexing
+  - [x] Region hierarchy (nested regions)
+  - [x] Topological ordering / dependency analysis
+  - [x] Subgraph extraction
+- [x] Implement content-addressed hashing for nodes (SHA-256 of content)
+- [x] Implement graph well-formedness validation:
+  - [x] No dangling edges
+  - [x] Port type/arity consistency
+  - [x] Region containment consistency
+  - [x] DAG property at expression level (cycles only via Iterate/Recurse)
+
+### Key Design Decisions
+
+- Use `petgraph` or a custom adjacency-list graph? **Decision: Custom.** HashMap-based storage with outgoing/incoming edge indexes, optimized for content-addressing and port-based edges.
+- UUID generation: use `uuid` crate with v4 for runtime IDs; SHA-256 content hashing in `torc-core::hash` for content addressing.
+
+### Acceptance Criteria
+
+- Can programmatically construct a graph with nodes, edges, and regions
+- Content-addressed IDs are deterministic (same content = same ID)
+- Well-formedness validation catches invalid graphs
+- All node kinds are representable
+- Unit tests for graph construction, validation, and topological ordering
+
+---
+
+## Phase 2: Type System
+
+**Goal:** Implement the full type universe as defined in spec section 4.
+
+### Tasks
+
+- [ ] Implement primitive types: `Void`, `Unit`, `Bool`, `Int<W,S>`, `Float<P>`, `Fixed<W,F>`
+- [ ] Implement refinement types: type + predicate (`where` clause)
+- [ ] Implement composite types: `Tuple`, `Record`, `Variant`, `Array`, `Vec`
+- [ ] Implement linear/affine types: `Linear<T>`, `Affine<T>`, `Shared<T>`, `Unique<T>`, `Counted<T>`
+- [ ] Implement effect types: `Pure`, `Alloc<R>`, `IO<D>`, `Atomic<O>`, `FFI<ABI>`, `Diverge`, `Panic`
+- [ ] Implement resource types: `Timed<T,B>`, `Sized<T,S>`, `Powered<T,E>`, `Bandwidth<T,R>`
+- [ ] Implement dependent types: types parameterized by values (e.g., `Matrix<T, Rows, Cols>`)
+- [ ] Implement probability types: `Distribution<T>`, `Posterior<T,E>`, `Interval<T,C>`, `Approximate<T,Err>`
+- [ ] Implement `TypeSignature` (input types + output types for nodes)
+- [ ] Implement type compatibility checking:
+  - [ ] Consistency check (edge source/target type compatibility)
+  - [ ] Linearity check (consumer count matches annotation)
+  - [ ] Effect check (declared effects superset of actual)
+  - [ ] Resource check (bounds consistency)
+  - [ ] Refinement check (generate proof obligations)
+- [ ] Implement type display/formatting for observability
+
+### Key Design Decisions
+
+- Represent the predicate language for refinement types. Need a small expression AST for first-order logic with arithmetic.
+- Dependent type values: represent as compile-time constants or symbolic expressions?
+
+### Acceptance Criteria
+
+- All type kinds from the spec are representable
+- Type compatibility checking works correctly
+- Linearity violations are detected
+- Effect propagation works (a node calling IO inherits IO)
+- Refinement predicates generate proof obligations (stubs for now)
+
+---
+
+## Phase 3: Contract System
+
+**Goal:** Implement the contract model and predicate language as defined in spec section 3.
+
+### Tasks
+
+- [ ] Implement `Contract` struct:
+  - [ ] `preconditions: Vec<Predicate>`
+  - [ ] `postconditions: Vec<Predicate>`
+  - [ ] `time_bound: Option<TimeBound>`
+  - [ ] `memory_bound: Option<MemoryBound>`
+  - [ ] `energy_bound: Option<EnergyBound>`
+  - [ ] `stack_bound: Option<StackBound>`
+  - [ ] `effects: EffectSet`
+  - [ ] `failure_modes: Vec<FailureMode>`
+  - [ ] `recovery_strategy: RecoveryStrategy`
+  - [ ] `proof_status: ProofStatus`
+  - [ ] `proof_witness: Option<ProofWitness>`
+- [ ] Implement the predicate language AST:
+  - [ ] Value constraints (`output >= 0 && output <= 4095`)
+  - [ ] Relational constraints (`output == f(input)`)
+  - [ ] Temporal constraints (`execution_time <= 50us`)
+  - [ ] Resource constraints (`heap_allocated == 0`)
+  - [ ] Invariant preservation (`sorted(output) && permutation(output, input)`)
+  - [ ] Information flow (`no_leak(secret_input, public_output)`)
+- [ ] Implement `ProofStatus` enum: `Verified`, `Assumed`, `Pending`, `Waived`
+- [ ] Implement `ProofWitness` structure (opaque proof object, content-addressed)
+- [ ] Implement `FailureMode` and `RecoveryStrategy` enums
+- [ ] Implement `EffectSet` (composable effect tracking)
+- [ ] Implement proof obligation generation from contracts:
+  - [ ] Type refinement obligations
+  - [ ] Pre/postcondition obligations
+  - [ ] Resource bound obligations (stubs — need target model)
+  - [ ] Linearity obligations
+  - [ ] Termination obligations
+- [ ] Implement `Waiver` struct with justification, author, approval, expiration
+
+### Acceptance Criteria
+
+- Contracts can be attached to nodes
+- Predicate AST can represent all predicate forms from the spec
+- Proof obligations are generated from contracts
+- Effect sets compose correctly
+- Waivers are representable with full metadata
+
+---
+
+## Phase 4: TRC Binary Format
+
+**Goal:** Implement serialization and deserialization of the .trc binary graph format as defined in spec section 3.
+
+### Tasks
+
+- [ ] Define the binary layout:
+  - [ ] Magic bytes: `0x54524300` ("TRC\0")
+  - [ ] Version field (major.minor.patch)
+  - [ ] Flags byte
+  - [ ] Header (counts and offsets)
+  - [ ] Node table
+  - [ ] Edge table
+  - [ ] Region table
+  - [ ] Contract table
+  - [ ] Proof table
+  - [ ] String table (interned strings)
+  - [ ] Provenance table
+  - [ ] Content hash (SHA-256 trailer)
+- [ ] Implement serialization (`Graph -> Vec<u8>`)
+- [ ] Implement deserialization (`&[u8] -> Graph`)
+- [ ] Implement content-hash verification on load
+- [ ] Implement incremental graph reading (lazy section loading)
+- [ ] Implement graph merging (for module linking)
+- [ ] Add format versioning and migration support
+
+### Acceptance Criteria
+
+- Round-trip: serialize a graph and deserialize it back to an identical graph
+- Content hash is verified on load; corrupted files are rejected
+- Large graphs serialize/deserialize efficiently
+- Format version is checked; incompatible versions are rejected
+
+---
+
+## Phase 5: Graph Construction API
+
+**Goal:** Provide a programmatic Rust API for building Torc graphs, suitable for use by AI systems.
+
+### Tasks
+
+- [ ] Design the builder API (`GraphBuilder`):
+  - [ ] `add_node(kind, type_sig, contract) -> NodeId`
+  - [ ] `add_edge(source, target, edge_type) -> EdgeId`
+  - [ ] `begin_region(kind) / end_region() -> RegionId`
+  - [ ] `add_annotation(node_id, key, value)`
+  - [ ] `set_provenance(node_id, provenance)`
+- [ ] Implement validation during construction:
+  - [ ] Type checking on edge creation
+  - [ ] Linearity checking
+  - [ ] Region containment enforcement
+- [ ] Implement graph manipulation:
+  - [ ] Replace subgraph
+  - [ ] Inline region
+  - [ ] Extract subgraph as module
+  - [ ] Graph composition (connect two graphs at interface ports)
+- [ ] Implement a convenience layer for common patterns:
+  - [ ] Arithmetic expressions
+  - [ ] Conditional selection
+  - [ ] Iteration construction
+  - [ ] FFI call wrapping
+- [ ] Design and document the API surface for AI consumers
+
+### Acceptance Criteria
+
+- Can build the Clarke transform example from spec section 12 using the API
+- Can build the safety monitor example from spec section 12
+- Invalid constructions are rejected with clear error messages
+- API is ergonomic for programmatic (non-human) use
+
+---
+
+## Phase 6: Verification Framework
+
+**Goal:** Implement the verification infrastructure as defined in spec section 10.
+
+### Tasks
+
+- [ ] Implement proof obligation registry (collect, track, cache)
+- [ ] Implement structural analysis engine:
+  - [ ] Linearity verification (graph structure only, no SMT)
+  - [ ] Effect propagation verification
+  - [ ] Graph well-formedness
+  - [ ] Ownership tracking
+- [ ] Integrate Z3 SMT solver:
+  - [ ] Rust bindings (via `z3` crate or `z3-sys`)
+  - [ ] Translate predicate AST to Z3 assertions
+  - [ ] Handle solver results (sat/unsat/unknown/timeout)
+  - [ ] Extract counterexamples on failure
+- [ ] Implement abstract interpretation (basic):
+  - [ ] Numeric range analysis (interval domain)
+  - [ ] Used for pre-screening before SMT
+- [ ] Implement proof witness generation and storage
+- [ ] Implement proof caching (content-addressed, incremental)
+- [ ] Implement verification reporting:
+  - [ ] Summary statistics
+  - [ ] Detailed failure diagnostics with counterexamples
+  - [ ] Suggestion generation (clamp, strengthen pre, weaken post, waive)
+- [ ] Implement verification profiles:
+  - [ ] `development` (fast, incremental, skip WCET)
+  - [ ] `integration` (full, with WCET)
+  - [ ] `certification` (exhaustive, independent proof checking)
+- [ ] Implement waiver management
+
+### Key Dependencies
+
+- Z3 or CVC5 must be available at build time (system dependency or vendored)
+- Consider making the solver backend pluggable
+
+### Acceptance Criteria
+
+- Can verify simple arithmetic refinement predicates via Z3
+- Linearity violations are caught by structural analysis
+- Proof results are cached and reused for unchanged subgraphs
+- Verification failures produce actionable diagnostics
+- Proof witnesses are generated and independently checkable
+
+---
+
+## Phase 7: Materialization Engine
+
+**Goal:** Implement the 6-phase materialization pipeline as defined in spec section 6.
+
+### Sub-phases
+
+#### Phase 7a: Graph Canonicalization
+- [ ] Subgraph deduplication via content hashing
+- [ ] Trivial subgraph inlining
+- [ ] Region flattening
+- [ ] Module reference resolution and linking
+
+#### Phase 7b: Verification Integration
+- [ ] Wire up Phase 6 verification as a materialization gate
+- [ ] Implement the "halt on unproven obligation" logic
+- [ ] Implement waiver-aware gating
+
+#### Phase 7c: Target-Aware Graph Transformation
+- [ ] Node lowering (abstract -> target-specific implementations)
+- [ ] Generic specialization / monomorphization
+- [ ] Execution scheduling (topological order with parallelism)
+- [ ] Memory layout assignment
+- [ ] ABI conformance (calling convention adaptation)
+
+#### Phase 7d: Resource Fitting
+- [ ] Flash/ROM size checking
+- [ ] RAM (static + stack + heap) checking
+- [ ] Stack depth analysis
+- [ ] WCET analysis integration (basic, for known targets)
+- [ ] Backtracking on resource constraint violation
+
+#### Phase 7e: LLVM Code Emission
+- [ ] Integrate LLVM via `inkwell` (Rust LLVM bindings) or `llvm-sys`
+- [ ] Torc Target IR -> LLVM IR translation
+- [ ] LLVM optimization pass configuration per profile
+- [ ] ELF emission for Linux x86_64 (initial target)
+- [ ] ELF emission for Linux ARM64
+- [ ] Bare-metal ELF for ARM Cortex-M
+
+#### Phase 7f: Post-Materialization Verification
+- [ ] Binary size verification against predictions
+- [ ] Symbol table validation
+- [ ] Smoke test generation from contracts (stretch)
+
+### Key Dependencies
+
+- LLVM libraries (system or vendored)
+- `inkwell` crate for Rust-LLVM bindings
+
+### Acceptance Criteria
+
+- Can materialize a trivial Torc graph to a running Linux x86_64 ELF binary
+- Resource checking correctly rejects programs that exceed target constraints
+- Optimization profiles produce measurably different output characteristics
+- Materialization reports are generated with resource utilization data
+
+---
+
+## Phase 8: Target Platform Models
+
+**Goal:** Implement the 3-layer platform model system as defined in spec section 7.
+
+### Tasks
+
+- [ ] Define TOML schema for ISA models
+- [ ] Define TOML schema for microarchitecture models
+- [ ] Define TOML schema for environment models
+- [ ] Implement model parsing and validation
+- [ ] Implement model composition (ISA + uarch + env = platform)
+- [ ] Create reference models:
+  - [ ] `linux-x86_64-gnu` (initial primary target)
+  - [ ] `linux-aarch64-gnu`
+  - [ ] `bare-metal-arm-cortex-m4f`
+- [ ] Implement `torc target describe` output
+- [ ] Implement resource constraint extraction from models (for Phase 7d)
+
+### Acceptance Criteria
+
+- Can parse and validate the STM32F407 example model from spec section 7
+- Platform models provide all data needed by the materialization engine
+- Custom target models can be authored and validated
+
+---
+
+## Phase 9: CLI Tool (`torc`)
+
+**Goal:** Implement the unified CLI as defined in spec section 5.
+
+### Tasks
+
+- [ ] Set up CLI framework (use `clap`)
+- [ ] Implement `torc init` — project scaffolding
+- [ ] Implement `torc build` — invoke materialization engine
+  - [ ] `--target`, `--all-targets`, `--release`, `--profile`
+  - [ ] `--emit=llvm-ir`, `--emit=asm`, `--emit=graph-stats`
+  - [ ] `--check-resources`
+- [ ] Implement `torc verify` — invoke verification framework
+  - [ ] `--module`, `--contract`, `--report`, `--status`
+  - [ ] `--incremental`
+- [ ] Implement `torc inspect` — launch observability views
+  - [ ] `--view dataflow|contracts|resources|pseudo-code|provenance|diff`
+  - [ ] `--module`, `--node`
+- [ ] Implement `torc target` subcommands
+  - [ ] `add`, `list`, `describe`, `validate`
+- [ ] Implement `torc doctor` — toolchain diagnostics
+- [ ] Implement `torc clean`
+- [ ] Implement `torc.toml` project manifest parsing
+- [ ] Implement configuration hierarchy (defaults, system, project, CLI, env vars)
+
+### Deferred to Later
+
+- [ ] `torc add` / `torc remove` / `torc update` (needs registry — Phase 12)
+- [ ] `torc publish` / `torc login` (needs registry — Phase 12)
+- [ ] `torc ffi bridge` (needs FFI — Phase 11)
+- [ ] `torc toolchain` / `torc component` (needs distribution infrastructure)
+
+### Acceptance Criteria
+
+- `torc init` creates a valid project skeleton
+- `torc build` invokes the materialization engine and produces an executable
+- `torc verify` runs verification and reports results
+- `torc inspect` produces human-readable output for all implemented views
+- Error messages are clear and actionable
+
+---
+
+## Phase 10: Observability Layer
+
+**Goal:** Implement human-readable projection views as defined in spec section 9.
+
+### Tasks
+
+- [ ] Implement projection view framework (view trait, rendering pipeline)
+- [ ] Implement **pseudo-code view**: generate procedural-style approximation from graph
+- [ ] Implement **contract view**: tabular contract summary
+- [ ] Implement **resource budget view**: ASCII bar charts of utilization
+- [ ] Implement **dataflow view**: text-based graph rendering (for terminal)
+  - [ ] Stretch: GraphViz DOT output for visual rendering
+- [ ] Implement **provenance view**: creation/edit history display
+- [ ] Implement **diff view**: semantic graph diff between versions
+- [ ] Implement export formats: JSON, CSV
+- [ ] Implement `torc inspect` integration (wire views to CLI)
+
+### Acceptance Criteria
+
+- Pseudo-code view produces readable output for the Clarke transform example
+- Contract view produces a table matching the spec section 9 format
+- Resource budget view shows bar charts with utilization percentages
+- Views are exportable to JSON
+
+---
+
+## Phase 11: FFI Bridge
+
+**Goal:** Implement C interoperability as defined in spec section 11.
+
+### Tasks
+
+- [ ] Implement FFI declaration parsing (`.ffi.toml` files)
+- [ ] Implement Torc-to-C bridge generation:
+  - [ ] Runtime precondition checks at boundary
+  - [ ] ABI adaptation (struct layout, calling convention)
+  - [ ] Postcondition validation on return
+  - [ ] Result wrapping (null -> Option::None, etc.)
+- [ ] Implement C-to-Torc bridge generation:
+  - [ ] C header generation from Torc graph interfaces
+  - [ ] Export symbol generation
+  - [ ] Contract documentation in header comments
+- [ ] Implement trust levels: `verified`, `platform`, `audited`, `unsafe`
+- [ ] Implement data marshaling:
+  - [ ] Primitive types (direct mapping)
+  - [ ] Structs (ABI-compatible layout)
+  - [ ] Strings (UTF-8 + null terminator)
+  - [ ] Arrays (pointer + length)
+- [ ] Implement `torc ffi bridge` CLI subcommand
+
+### Stretch Goal
+
+- [ ] Rust interop bridge (leveraging ownership model alignment)
+
+### Acceptance Criteria
+
+- Can declare a C library interface and generate Torc wrapper nodes
+- Can export Torc functions with C-compatible headers
+- Runtime checks are inserted at FFI boundaries
+- Generated C headers include contract documentation
+
+---
+
+## Phase 12: Registry Client
+
+**Goal:** Implement the package registry client as defined in spec section 8.
+
+### Tasks
+
+- [ ] Define registry API protocol (HTTP + content-addressed storage)
+- [ ] Implement module manifest parsing
+- [ ] Implement dependency resolution (semver with contract awareness)
+- [ ] Implement `torc add` / `torc remove` / `torc update`
+- [ ] Implement `torc tree` — dependency tree display
+- [ ] Implement `torc publish` — package publishing
+- [ ] Implement `torc audit` — dependency auditing
+- [ ] Implement local module cache
+- [ ] Implement content-addressed integrity verification
+- [ ] Implement registry authentication
+
+### Deferred
+
+- [ ] Private registry hosting
+- [ ] Federated registry resolution
+- [ ] Proof library publishing and resolution
+- [ ] Cryptographic signing infrastructure
+
+### Acceptance Criteria
+
+- Can publish a module to a local test registry
+- Can fetch and resolve dependencies
+- Dependency tree is displayed correctly
+- Content integrity is verified on fetch
+
+---
+
+## Phase 13: Integration & Examples
+
+**Goal:** Validate the complete system with end-to-end examples from the spec.
+
+### Tasks
+
+- [ ] Implement the checksum example from spec section 3 (textual projection)
+- [ ] Implement the Clarke transform from spec section 12
+- [ ] Implement the safety monitor from spec section 12
+- [ ] Implement the PID controller module
+- [ ] Build the complete FOC motor controller example:
+  - [ ] Materialize for Linux x86_64 simulation target
+  - [ ] Materialize for STM32F407 bare-metal target (if Phase 7e embedded support complete)
+- [ ] Produce verification report matching spec section 12 output
+- [ ] Produce resource utilization report matching spec section 12 output
+- [ ] Document the end-to-end workflow
+
+### Acceptance Criteria
+
+- At least one non-trivial Torc program materializes to a running executable
+- Verification produces meaningful results (not just "all trivially pass")
+- Observability views produce output matching spec examples
+- The workflow from graph construction to executable is fully automated via `torc`
+
+---
+
+## Cross-Cutting Concerns
+
+### Error Handling
+
+- Use `thiserror` for library error types
+- Use `anyhow` in the CLI for ergonomic error reporting
+- All errors should be actionable: tell the user what went wrong and suggest a fix
+
+### Testing Strategy
+
+- Unit tests in each crate (`#[cfg(test)]` modules)
+- Integration tests in `tests/integration/`
+- Property-based testing with `proptest` for graph operations and serialization
+- Snapshot tests for observability output
+
+### Documentation
+
+- Rustdoc for all public APIs
+- Architecture decision records (ADRs) for significant design choices
+- Spec cross-references in code comments
+
+### Performance
+
+- Profile critical paths (serialization, verification, materialization)
+- Benchmark suite for regression detection
+- Target: incremental materialization under 2 seconds for localized changes
+
+---
+
+## Dependencies (External)
+
+| Dependency | Purpose | Phase |
+|------------|---------|-------|
+| `uuid` | Node/edge/region identifiers | 1 |
+| `sha2` | Content-addressed hashing | 1 |
+| `serde` / `serde_json` | Serialization infrastructure | 1 |
+| `toml` | Config and manifest parsing | 5, 8, 9 |
+| `clap` | CLI framework | 9 |
+| `z3` / `z3-sys` | SMT solver integration | 6 |
+| `inkwell` / `llvm-sys` | LLVM bindings for code emission | 7 |
+| `petgraph` | Graph algorithms (evaluation needed) | 1 |
+| `proptest` | Property-based testing | 1+ |
+| `thiserror` / `anyhow` | Error handling | 1+ |
+| `reqwest` | HTTP client for registry | 12 |
+| `indicatif` | CLI progress bars | 9 |
+
+---
+
+## Milestone Targets
+
+### M1: "Hello Graph" — Phases 0-4 complete
+A Torc graph can be constructed programmatically, serialized to `.trc`, deserialized, and the round-trip verified.
+
+### M2: "Verified Graph" — Phase 6 complete
+Proof obligations are generated from contracts and discharged via Z3. Verification reports are produced.
+
+### M3: "First Executable" — Phase 7 (partial) complete
+A trivial Torc graph materializes to a running Linux x86_64 ELF binary via LLVM.
+
+### M4: "Developer Preview" — Phases 8-10 complete
+The `torc` CLI supports init, build, verify, and inspect. Platform models are parsed. Observability views work.
+
+### M5: "Interop" — Phase 11 complete
+Torc programs can call C libraries and be called from C code.
+
+### M6: "Ecosystem" — Phase 12-13 complete
+Packages can be published and fetched. The FOC motor controller example works end-to-end.
+
+---
+
+## Open Questions
+
+1. **Graph library choice:** Use `petgraph` as a foundation or build a custom graph structure optimized for content-addressing and port-based edges?
+2. **Z3 integration strategy:** Vendor Z3 or require it as a system dependency? The `z3` crate supports both.
+3. **LLVM version:** Which LLVM version to target? `inkwell` supports LLVM 14-18. Need to balance feature availability with platform support.
+4. **Provenance storage:** Store full provenance in-memory or use a separate on-disk database for large projects?
+5. **Incremental materialization strategy:** File-level granularity (re-materialize changed modules) or node-level (patch binary in place)?
+
+---
+
+*This is a living document. Update it as implementation progresses and decisions are made.*
