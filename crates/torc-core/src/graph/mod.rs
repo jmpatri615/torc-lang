@@ -22,6 +22,10 @@ use self::edge::{Edge, EdgeId};
 use self::node::{Node, NodeId, NodeKind};
 use self::region::{Region, RegionId};
 
+use crate::contract::{EffectSet, ProofObligation};
+use crate::types::check::types_compatible;
+use crate::types::Linearity;
+
 /// Errors that can occur during graph construction or validation.
 #[derive(Debug, Error)]
 pub enum GraphError {
@@ -54,6 +58,28 @@ pub enum GraphError {
 
     #[error("duplicate child node {child} in region {region}")]
     DuplicateRegionChild { child: NodeId, region: RegionId },
+
+    #[error("linearity violation: {kind:?} value at node {node} port {port} has {consumers} consumer(s)")]
+    LinearityViolation {
+        node: NodeId,
+        port: usize,
+        kind: crate::types::Linearity,
+        consumers: usize,
+    },
+
+    #[error("effect violation: node {node} declares {declared} but depends on {required}")]
+    EffectViolation {
+        node: NodeId,
+        declared: String,
+        required: String,
+    },
+
+    #[error("type mismatch on edge {edge}: expected {expected}, found {found}")]
+    TypeMismatch {
+        edge: EdgeId,
+        expected: String,
+        found: String,
+    },
 }
 
 /// The core graph container for a Torc program.
@@ -455,6 +481,193 @@ impl Graph {
         }
 
         Ok(result)
+    }
+
+    /// Validate that linear/affine values have the correct number of consumers.
+    ///
+    /// - `Linear` / `Unique`: exactly 1 consumer
+    /// - `Affine`: 0 or 1 consumers
+    /// - Others: any count (skip)
+    pub fn validate_linearity(&self) -> Result<(), Vec<GraphError>> {
+        let mut errors = Vec::new();
+
+        for node in self.nodes.values() {
+            let sig = match &node.type_signature {
+                Some(s) => s,
+                None => continue,
+            };
+
+            for (port_idx, output_type) in sig.outputs.iter().enumerate() {
+                let lin = match output_type.linearity() {
+                    Some(l) => l,
+                    None => continue,
+                };
+
+                // Count outgoing edges from this (node, port_index) pair
+                let consumers = self
+                    .outgoing_edges(&node.id)
+                    .iter()
+                    .filter_map(|eid| self.edges.get(eid))
+                    .filter(|e| e.source.0 == node.id && e.source.1 == port_idx)
+                    .count();
+
+                match lin {
+                    Linearity::Linear | Linearity::Unique => {
+                        if consumers != 1 {
+                            errors.push(GraphError::LinearityViolation {
+                                node: node.id,
+                                port: port_idx,
+                                kind: lin,
+                                consumers,
+                            });
+                        }
+                    }
+                    Linearity::Affine => {
+                        if consumers > 1 {
+                            errors.push(GraphError::LinearityViolation {
+                                node: node.id,
+                                port: port_idx,
+                                kind: lin,
+                                consumers,
+                            });
+                        }
+                    }
+                    Linearity::Shared | Linearity::Counted | Linearity::Unrestricted => {}
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// Validate that each node's declared effects are a superset of its predecessors' effects.
+    ///
+    /// For each node, gathers effects from all predecessor nodes (via incoming edges).
+    /// Verifies that the node's own declared effects are a superset of the union.
+    pub fn validate_effects(&self) -> Result<(), Vec<GraphError>> {
+        let mut errors = Vec::new();
+
+        for node in self.nodes.values() {
+            let node_effects = match &node.contract {
+                Some(c) => &c.effects,
+                None => continue,
+            };
+
+            // Gather effects from all predecessor nodes
+            let mut required = EffectSet::empty();
+            for edge_id in self.incoming_edges(&node.id) {
+                if let Some(edge) = self.edges.get(edge_id) {
+                    if let Some(pred_node) = self.nodes.get(&edge.source.0) {
+                        if let Some(pred_contract) = &pred_node.contract {
+                            required.merge(&pred_contract.effects);
+                        }
+                    }
+                }
+            }
+
+            // If required effects are pure, nothing to check
+            if required.is_pure() {
+                continue;
+            }
+
+            // Check that node's declared effects are a superset
+            for effect in &required.effects {
+                if !node_effects.has_effect(effect) {
+                    errors.push(GraphError::EffectViolation {
+                        node: node.id,
+                        declared: format!("{node_effects}"),
+                        required: format!("{required}"),
+                    });
+                    break; // One error per node is sufficient
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// Validate that edge source/target types are compatible.
+    ///
+    /// Returns any proof obligations generated by refinement subtyping.
+    /// Skips edges where either node lacks a TypeSignature.
+    pub fn validate_edge_types(&self) -> Result<Vec<ProofObligation>, Vec<GraphError>> {
+        let mut errors = Vec::new();
+        let mut obligations = Vec::new();
+
+        for edge in self.edges.values() {
+            let source_type = self
+                .nodes
+                .get(&edge.source.0)
+                .and_then(|n| n.type_signature.as_ref())
+                .and_then(|sig| sig.outputs.get(edge.source.1));
+
+            let target_type = self
+                .nodes
+                .get(&edge.target.0)
+                .and_then(|n| n.type_signature.as_ref())
+                .and_then(|sig| sig.inputs.get(edge.target.1));
+
+            let (src_ty, tgt_ty) = match (source_type, target_type) {
+                (Some(s), Some(t)) => (s, t),
+                _ => continue,
+            };
+
+            match types_compatible(src_ty, tgt_ty) {
+                Ok(obs) => obligations.extend(obs),
+                Err(_) => {
+                    errors.push(GraphError::TypeMismatch {
+                        edge: edge.id,
+                        expected: format!("{tgt_ty}"),
+                        found: format!("{src_ty}"),
+                    });
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(obligations)
+        } else {
+            Err(errors)
+        }
+    }
+
+    /// Run all type-related validation checks.
+    ///
+    /// Combines consistency (edge type compatibility), linearity validation,
+    /// and effect propagation checks. Returns proof obligations from refinement
+    /// subtyping. Structural validation (`validate()`) should be run separately.
+    pub fn validate_types(&self) -> Result<Vec<ProofObligation>, Vec<GraphError>> {
+        let mut all_errors = Vec::new();
+
+        if let Err(errs) = self.validate_linearity() {
+            all_errors.extend(errs);
+        }
+
+        if let Err(errs) = self.validate_effects() {
+            all_errors.extend(errs);
+        }
+
+        let obligations = match self.validate_edge_types() {
+            Ok(obs) => obs,
+            Err(errs) => {
+                all_errors.extend(errs);
+                Vec::new()
+            }
+        };
+
+        if all_errors.is_empty() {
+            Ok(obligations)
+        } else {
+            Err(all_errors)
+        }
     }
 
     /// Validate graph well-formedness.
@@ -911,6 +1124,223 @@ mod tests {
         assert_eq!(sub.parent_region(&inner_id), None);
         // Subgraph must pass validation (no dangling parent)
         assert!(sub.validate().is_ok());
+    }
+
+    #[test]
+    fn linearity_linear_exactly_one() {
+        use crate::types::{Linearity, Type, TypeSignature};
+
+        let mut g = Graph::new();
+        let n1 = Node::new(NodeKind::Literal)
+            .with_type_signature(TypeSignature::source(Type::i32().with_linearity(Linearity::Linear)));
+        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
+            .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+
+        // Linear with exactly 1 consumer: OK
+        assert!(g.validate_linearity().is_ok());
+    }
+
+    #[test]
+    fn linearity_linear_zero_consumers() {
+        use crate::types::{Linearity, Type, TypeSignature};
+
+        let mut g = Graph::new();
+        // Linear value with no consumers: violation (must be used exactly once)
+        let n1 = Node::new(NodeKind::Literal)
+            .with_type_signature(TypeSignature::source(Type::i32().with_linearity(Linearity::Linear)));
+        g.add_node(n1).unwrap();
+
+        let result = g.validate_linearity();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| matches!(e, GraphError::LinearityViolation { consumers: 0, .. })));
+    }
+
+    #[test]
+    fn linearity_linear_two_consumers() {
+        use crate::types::{Linearity, Type, TypeSignature};
+
+        let mut g = Graph::new();
+        let n1 = Node::new(NodeKind::Literal)
+            .with_type_signature(TypeSignature::source(Type::i32().with_linearity(Linearity::Linear)));
+        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
+            .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
+        let n3 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Mul))
+            .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
+        let id1 = n1.id;
+        let id2 = n2.id;
+        let id3 = n3.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_node(n3).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id3, 0))).unwrap();
+
+        // Linear with 2 consumers: violation
+        let result = g.validate_linearity();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| matches!(e, GraphError::LinearityViolation { consumers: 2, .. })));
+    }
+
+    #[test]
+    fn linearity_affine_zero_ok() {
+        use crate::types::{Linearity, Type, TypeSignature};
+
+        let mut g = Graph::new();
+        let n1 = Node::new(NodeKind::Literal)
+            .with_type_signature(TypeSignature::source(Type::i32().with_linearity(Linearity::Affine)));
+        g.add_node(n1).unwrap();
+
+        // Affine with 0 consumers: OK (may be dropped)
+        assert!(g.validate_linearity().is_ok());
+    }
+
+    #[test]
+    fn linearity_affine_two_fails() {
+        use crate::types::{Linearity, Type, TypeSignature};
+
+        let mut g = Graph::new();
+        let n1 = Node::new(NodeKind::Literal)
+            .with_type_signature(TypeSignature::source(Type::i32().with_linearity(Linearity::Affine)));
+        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
+            .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
+        let n3 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Mul))
+            .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
+        let id1 = n1.id;
+        let id2 = n2.id;
+        let id3 = n3.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_node(n3).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id3, 0))).unwrap();
+
+        // Affine with 2 consumers: violation
+        assert!(g.validate_linearity().is_err());
+    }
+
+    #[test]
+    fn effect_propagation_pass() {
+        use crate::contract::{Contract, EffectSet};
+        use crate::types::{Effect, Type, TypeSignature};
+
+        let mut g = Graph::new();
+        // Pure predecessor
+        let n1 = Node::new(NodeKind::Literal)
+            .with_type_signature(TypeSignature::source(Type::i32()))
+            .with_contract(Contract::pure_default());
+        // IO node depending on pure node: should pass
+        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
+            .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()))
+            .with_contract(
+                Contract::pure_default()
+                    .with_effects(EffectSet::from_effects(vec![Effect::IO("UART1".into())])),
+            );
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+
+        assert!(g.validate_effects().is_ok());
+    }
+
+    #[test]
+    fn effect_propagation_violation() {
+        use crate::contract::{Contract, EffectSet};
+        use crate::types::{Effect, Type, TypeSignature};
+
+        let mut g = Graph::new();
+        // IO predecessor
+        let n1 = Node::new(NodeKind::Literal)
+            .with_type_signature(TypeSignature::source(Type::i32()))
+            .with_contract(
+                Contract::pure_default()
+                    .with_effects(EffectSet::from_effects(vec![Effect::IO("UART1".into())])),
+            );
+        // Pure node depending on IO node: violation
+        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
+            .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()))
+            .with_contract(Contract::pure_default());
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+
+        let result = g.validate_effects();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| matches!(e, GraphError::EffectViolation { .. })));
+    }
+
+    #[test]
+    fn edge_type_compatibility_pass() {
+        use crate::types::{Type, TypeSignature};
+
+        let mut g = Graph::new();
+        let n1 = Node::new(NodeKind::Literal)
+            .with_type_signature(TypeSignature::source(Type::i32()));
+        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
+            .with_type_signature(TypeSignature::pure_fn(vec![Type::i32(), Type::i32()], Type::i32()));
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+
+        let result = g.validate_edge_types();
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn edge_type_compatibility_fail() {
+        use crate::types::{Type, TypeSignature};
+
+        let mut g = Graph::new();
+        // Source outputs f64
+        let n1 = Node::new(NodeKind::Literal)
+            .with_type_signature(TypeSignature::source(Type::f64()));
+        // Target expects i32 input
+        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
+            .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+
+        let result = g.validate_edge_types();
+        assert!(result.is_err());
+        let errors = result.unwrap_err();
+        assert!(errors.iter().any(|e| matches!(e, GraphError::TypeMismatch { .. })));
+    }
+
+    #[test]
+    fn validate_types_combined() {
+        use crate::types::{Type, TypeSignature};
+
+        let mut g = Graph::new();
+        let n1 = Node::new(NodeKind::Literal)
+            .with_type_signature(TypeSignature::source(Type::i32()));
+        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
+            .with_type_signature(TypeSignature::pure_fn(vec![Type::i32(), Type::i32()], Type::i32()));
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+
+        // validate_types should pass and return no obligations
+        let result = g.validate_types();
+        assert!(result.is_ok());
     }
 
     #[test]

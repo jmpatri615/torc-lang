@@ -10,6 +10,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+pub mod check;
+
 /// Signedness of an integer type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Signedness {
@@ -225,6 +227,8 @@ pub enum Type {
     Sized { inner: Box<Type>, max_bytes: usize },
     /// Value produced within an energy budget (microjoules).
     Powered { inner: Box<Type>, energy_uj: u64 },
+    /// Value transmitted within a throughput bound.
+    Bandwidth { inner: Box<Type>, min_bps: u64 },
 
     // === Probability ===
     /// A probability distribution over a type.
@@ -415,6 +419,49 @@ impl Type {
         }
     }
 
+    /// Wrap with a minimum bandwidth bound (bytes per second).
+    pub fn bandwidth(self, min_bps: u64) -> Self {
+        Type::Bandwidth {
+            inner: Box::new(self),
+            min_bps,
+        }
+    }
+
+    /// Wrap with an energy budget (microjoules).
+    pub fn powered(self, energy_uj: u64) -> Self {
+        Type::Powered {
+            inner: Box::new(self),
+            energy_uj,
+        }
+    }
+
+    /// Extract the innermost linearity annotation, if any.
+    /// Peels through Timed, Sized, Powered, Bandwidth, Refined wrappers.
+    pub fn linearity(&self) -> Option<Linearity> {
+        match self {
+            Type::Linear { linearity, .. } => Some(*linearity),
+            Type::Timed { inner, .. }
+            | Type::Sized { inner, .. }
+            | Type::Powered { inner, .. }
+            | Type::Bandwidth { inner, .. }
+            | Type::Refined { base: inner, .. } => inner.linearity(),
+            _ => None,
+        }
+    }
+
+    /// Extract the innermost base type, peeling all wrappers.
+    pub fn base_type(&self) -> &Type {
+        match self {
+            Type::Linear { inner, .. }
+            | Type::Timed { inner, .. }
+            | Type::Sized { inner, .. }
+            | Type::Powered { inner, .. }
+            | Type::Bandwidth { inner, .. }
+            | Type::Refined { base: inner, .. } => inner.base_type(),
+            _ => self,
+        }
+    }
+
     /// Check if this type is a primitive (non-composite, non-wrapped).
     pub fn is_primitive(&self) -> bool {
         matches!(
@@ -491,6 +538,7 @@ impl fmt::Display for Type {
             }
             Type::Sized { inner, max_bytes } => write!(f, "Sized<{inner}, {max_bytes}B>"),
             Type::Powered { inner, energy_uj } => write!(f, "Powered<{inner}, {energy_uj}μJ>"),
+            Type::Bandwidth { inner, min_bps } => write!(f, "Bandwidth<{inner}, {min_bps}Bps>"),
             Type::Distribution(inner) => write!(f, "Distribution<{inner}>"),
             Type::Posterior { inner, evidence } => {
                 write!(f, "Posterior<{inner}, {evidence}>")
@@ -625,6 +673,75 @@ mod tests {
             }
             _ => panic!("expected And"),
         }
+    }
+
+    #[test]
+    fn bandwidth_type() {
+        let bw = Type::u8().bandwidth(1_000_000);
+        match &bw {
+            Type::Bandwidth { inner, min_bps } => {
+                assert_eq!(**inner, Type::u8());
+                assert_eq!(*min_bps, 1_000_000);
+            }
+            _ => panic!("expected Bandwidth"),
+        }
+        assert_eq!(format!("{bw}"), "Bandwidth<u8, 1000000Bps>");
+    }
+
+    #[test]
+    fn powered_type() {
+        let pw = Type::f32().powered(500);
+        match &pw {
+            Type::Powered { inner, energy_uj } => {
+                assert_eq!(**inner, Type::f32());
+                assert_eq!(*energy_uj, 500);
+            }
+            _ => panic!("expected Powered"),
+        }
+    }
+
+    #[test]
+    fn linearity_helper_through_wrappers() {
+        // Timed<Sized<Linear<i32>>> should extract Linear
+        let wrapped = Type::i32()
+            .with_linearity(Linearity::Linear)
+            .sized(4)
+            .timed(100, "test");
+        assert_eq!(wrapped.linearity(), Some(Linearity::Linear));
+
+        // Bandwidth<Powered<Affine<f32>>> should extract Affine
+        let wrapped2 = Type::f32()
+            .with_linearity(Linearity::Affine)
+            .powered(100)
+            .bandwidth(1000);
+        assert_eq!(wrapped2.linearity(), Some(Linearity::Affine));
+
+        // Refined<Unique<i32>> should extract Unique
+        let wrapped3 = Type::i32()
+            .with_linearity(Linearity::Unique)
+            .refined(Predicate::positive("value"));
+        assert_eq!(wrapped3.linearity(), Some(Linearity::Unique));
+
+        // Bare i32 has no linearity
+        assert_eq!(Type::i32().linearity(), None);
+    }
+
+    #[test]
+    fn base_type_peeling() {
+        // Timed<Sized<Linear<Refined<f32>>>> should peel to f32
+        let nested = Type::f32()
+            .refined(Predicate::positive("value"))
+            .with_linearity(Linearity::Linear)
+            .sized(4)
+            .timed(100, "test");
+        assert_eq!(*nested.base_type(), Type::f32());
+
+        // Bare type returns itself
+        assert_eq!(*Type::i32().base_type(), Type::i32());
+
+        // Bandwidth<Powered<u8>> peels to u8
+        let bw = Type::u8().powered(50).bandwidth(1000);
+        assert_eq!(*bw.base_type(), Type::u8());
     }
 
     #[test]

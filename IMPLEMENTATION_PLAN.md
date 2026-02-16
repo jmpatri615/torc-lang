@@ -2,7 +2,7 @@
 
 **Version:** 0.1.0
 **Last Updated:** 2026-02-15
-**Status:** Phase 1 — Complete
+**Status:** Phase 2 — Complete
 
 ---
 
@@ -20,7 +20,7 @@ The reference implementation is written in **Rust**, chosen for its memory safet
 |-------|------|-------------|--------|
 | 0 | Project Setup | Repo structure, CI, workspace layout | **In Progress** |
 | 1 | Core Graph Model | Nodes, edges, regions, basic types | **Complete** |
-| 2 | Type System | Full type universe implementation | Not Started |
+| 2 | Type System | Full type universe implementation | **Complete** |
 | 3 | Contract System | Contracts, predicates, proof obligations | Not Started |
 | 4 | TRC Binary Format | Serialization/deserialization of .trc files | Not Started |
 | 5 | Graph Construction API | Programmatic API for building graphs | Not Started |
@@ -159,22 +159,22 @@ torc/
 
 ### Tasks
 
-- [ ] Implement primitive types: `Void`, `Unit`, `Bool`, `Int<W,S>`, `Float<P>`, `Fixed<W,F>`
-- [ ] Implement refinement types: type + predicate (`where` clause)
-- [ ] Implement composite types: `Tuple`, `Record`, `Variant`, `Array`, `Vec`
-- [ ] Implement linear/affine types: `Linear<T>`, `Affine<T>`, `Shared<T>`, `Unique<T>`, `Counted<T>`
-- [ ] Implement effect types: `Pure`, `Alloc<R>`, `IO<D>`, `Atomic<O>`, `FFI<ABI>`, `Diverge`, `Panic`
-- [ ] Implement resource types: `Timed<T,B>`, `Sized<T,S>`, `Powered<T,E>`, `Bandwidth<T,R>`
-- [ ] Implement dependent types: types parameterized by values (e.g., `Matrix<T, Rows, Cols>`)
-- [ ] Implement probability types: `Distribution<T>`, `Posterior<T,E>`, `Interval<T,C>`, `Approximate<T,Err>`
-- [ ] Implement `TypeSignature` (input types + output types for nodes)
-- [ ] Implement type compatibility checking:
-  - [ ] Consistency check (edge source/target type compatibility)
-  - [ ] Linearity check (consumer count matches annotation)
-  - [ ] Effect check (declared effects superset of actual)
-  - [ ] Resource check (bounds consistency)
-  - [ ] Refinement check (generate proof obligations)
-- [ ] Implement type display/formatting for observability
+- [x] Implement primitive types: `Void`, `Unit`, `Bool`, `Int<W,S>`, `Float<P>`, `Fixed<W,F>`
+- [x] Implement refinement types: type + predicate (`where` clause)
+- [x] Implement composite types: `Tuple`, `Record`, `Variant`, `Array`, `Vec`
+- [x] Implement linear/affine types: `Linear<T>`, `Affine<T>`, `Shared<T>`, `Unique<T>`, `Counted<T>`
+- [x] Implement effect types: `Pure`, `Alloc<R>`, `IO<D>`, `Atomic<O>`, `FFI<ABI>`, `Diverge`, `Panic`
+- [x] Implement resource types: `Timed<T,B>`, `Sized<T,S>`, `Powered<T,E>`, `Bandwidth<T,R>`
+- [x] Implement dependent types: types parameterized by values (e.g., `Matrix<T, Rows, Cols>`)
+- [x] Implement probability types: `Distribution<T>`, `Posterior<T,E>`, `Interval<T,C>`, `Approximate<T,Err>`
+- [x] Implement `TypeSignature` (input types + output types for nodes)
+- [x] Implement type compatibility checking:
+  - [x] Consistency check (edge source/target type compatibility)
+  - [x] Linearity check (consumer count matches annotation)
+  - [x] Effect check (declared effects superset of actual)
+  - [x] Resource check (bounds consistency)
+  - [x] Refinement check (generate proof obligations)
+- [x] Implement type display/formatting for observability
 
 ### Key Design Decisions
 
