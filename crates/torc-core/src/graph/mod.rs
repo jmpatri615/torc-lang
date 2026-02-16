@@ -22,9 +22,9 @@ use self::edge::{Edge, EdgeId};
 use self::node::{Node, NodeId, NodeKind};
 use self::region::{Region, RegionId};
 
-use crate::contract::{EffectSet, ProofObligation};
+use crate::contract::{EffectSet, ObligationKind, ProofObligation, ProofStatus};
 use crate::types::check::types_compatible;
-use crate::types::Linearity;
+use crate::types::{Linearity, Predicate};
 
 /// Errors that can occur during graph construction or validation.
 #[derive(Debug, Error)]
@@ -639,13 +639,84 @@ impl Graph {
         }
     }
 
+    /// Validate contracts and generate proof obligations.
+    ///
+    /// Performs three kinds of obligation generation:
+    /// 1. Per-node: calls `contract.generate_obligations()` for each contracted node
+    /// 2. Edge-crossing: for edges where both source and target have contracts,
+    ///    generates an implication obligation (postcondition => precondition)
+    /// 3. Termination: for Iterate/Recurse/Fixpoint nodes, generates a termination obligation
+    pub fn validate_contracts(&self) -> Vec<ProofObligation> {
+        let mut obligations = Vec::new();
+
+        // A. Per-node obligations
+        for node in self.nodes.values() {
+            if let Some(ref contract) = node.contract {
+                obligations.extend(contract.generate_obligations());
+            }
+        }
+
+        // B. Edge-crossing obligations
+        for edge in self.edges.values() {
+            let src_contract = self
+                .nodes
+                .get(&edge.source.0)
+                .and_then(|n| n.contract.as_ref());
+            let tgt_contract = self
+                .nodes
+                .get(&edge.target.0)
+                .and_then(|n| n.contract.as_ref());
+
+            if let (Some(src_c), Some(tgt_c)) = (src_contract, tgt_contract) {
+                // For each postcondition of source and precondition of target,
+                // generate an implication obligation: post => pre
+                for post in &src_c.postconditions {
+                    for pre in &tgt_c.preconditions {
+                        obligations.push(ProofObligation {
+                            kind: ObligationKind::Precondition,
+                            predicate: Predicate::Implies(
+                                Box::new(post.clone()),
+                                Box::new(pre.clone()),
+                            ),
+                            description: "edge-crossing: postcondition of source implies precondition of target".to_string(),
+                            status: ProofStatus::Pending,
+                            witness: None,
+                            waiver: None,
+                        });
+                    }
+                }
+            }
+        }
+
+        // C. Termination obligations
+        for node in self.nodes.values() {
+            if matches!(
+                node.kind,
+                NodeKind::Iterate | NodeKind::Recurse | NodeKind::Fixpoint
+            ) {
+                obligations.push(ProofObligation {
+                    kind: ObligationKind::Termination,
+                    predicate: Predicate::BoolLit(true),
+                    description: format!("{} node must terminate", node.kind),
+                    status: ProofStatus::Pending,
+                    witness: None,
+                    waiver: None,
+                });
+            }
+        }
+
+        obligations
+    }
+
     /// Run all type-related validation checks.
     ///
     /// Combines consistency (edge type compatibility), linearity validation,
-    /// and effect propagation checks. Returns proof obligations from refinement
-    /// subtyping. Structural validation (`validate()`) should be run separately.
+    /// effect propagation checks, and contract validation. Returns proof
+    /// obligations from refinement subtyping and contract generation.
+    /// Structural validation (`validate()`) should be run separately.
     pub fn validate_types(&self) -> Result<Vec<ProofObligation>, Vec<GraphError>> {
         let mut all_errors = Vec::new();
+        let mut all_obligations = Vec::new();
 
         if let Err(errs) = self.validate_linearity() {
             all_errors.extend(errs);
@@ -655,16 +726,15 @@ impl Graph {
             all_errors.extend(errs);
         }
 
-        let obligations = match self.validate_edge_types() {
-            Ok(obs) => obs,
-            Err(errs) => {
-                all_errors.extend(errs);
-                Vec::new()
-            }
-        };
+        match self.validate_edge_types() {
+            Ok(obs) => all_obligations.extend(obs),
+            Err(errs) => all_errors.extend(errs),
+        }
+
+        all_obligations.extend(self.validate_contracts());
 
         if all_errors.is_empty() {
-            Ok(obligations)
+            Ok(all_obligations)
         } else {
             Err(all_errors)
         }
@@ -1408,5 +1478,133 @@ mod tests {
         // Region.parent field is also updated
         let inner_region = g.get_region(&inner_id).unwrap();
         assert_eq!(inner_region.parent, Some(outer_id));
+    }
+
+    #[test]
+    fn edge_crossing_obligation() {
+        use crate::contract::Contract;
+        use crate::types::{Predicate, Type, TypeSignature};
+
+        let mut g = Graph::new();
+        let n1 = Node::new(NodeKind::Literal)
+            .with_type_signature(TypeSignature::source(Type::i32()))
+            .with_contract(Contract::with_conditions(
+                vec![],
+                vec![Predicate::positive("output")],
+            ));
+        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
+            .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()))
+            .with_contract(Contract::with_conditions(
+                vec![Predicate::positive("input")],
+                vec![],
+            ));
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+
+        let obs = g.validate_contracts();
+        // Should have: 1 postcondition from n1 + 1 precondition from n2 + 1 edge-crossing implication
+        let edge_crossing = obs
+            .iter()
+            .filter(|o| matches!(&o.predicate, Predicate::Implies(..)))
+            .count();
+        assert_eq!(edge_crossing, 1);
+    }
+
+    #[test]
+    fn termination_obligation_iterate() {
+        use crate::contract::ObligationKind;
+
+        let mut g = Graph::new();
+        let n = Node::new(NodeKind::Iterate);
+        g.add_node(n).unwrap();
+
+        let obs = g.validate_contracts();
+        assert_eq!(obs.len(), 1);
+        assert_eq!(obs[0].kind, ObligationKind::Termination);
+        assert!(obs[0].description.contains("Iterate"));
+    }
+
+    #[test]
+    fn termination_obligation_recurse() {
+        use crate::contract::ObligationKind;
+
+        let mut g = Graph::new();
+        let n = Node::new(NodeKind::Recurse);
+        g.add_node(n).unwrap();
+
+        let obs = g.validate_contracts();
+        assert_eq!(obs.len(), 1);
+        assert_eq!(obs[0].kind, ObligationKind::Termination);
+        assert!(obs[0].description.contains("Recurse"));
+    }
+
+    #[test]
+    fn termination_obligation_fixpoint() {
+        use crate::contract::ObligationKind;
+
+        let mut g = Graph::new();
+        let n = Node::new(NodeKind::Fixpoint);
+        g.add_node(n).unwrap();
+
+        let obs = g.validate_contracts();
+        assert_eq!(obs.len(), 1);
+        assert_eq!(obs[0].kind, ObligationKind::Termination);
+        assert!(obs[0].description.contains("Fixpoint"));
+    }
+
+    #[test]
+    fn validate_contracts_integration() {
+        use crate::contract::{Contract, ObligationKind};
+        use crate::types::{Predicate, Type, TypeSignature};
+
+        let mut g = Graph::new();
+        // Literal with postcondition
+        let n1 = Node::new(NodeKind::Literal)
+            .with_type_signature(TypeSignature::source(Type::i32()))
+            .with_contract(Contract::with_conditions(
+                vec![],
+                vec![Predicate::positive("output")],
+            ));
+        // Iterate node with contract
+        let n2 = Node::new(NodeKind::Iterate)
+            .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()))
+            .with_contract(Contract::with_conditions(
+                vec![Predicate::positive("input")],
+                vec![],
+            ));
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+
+        let obs = g.validate_contracts();
+
+        // Expected obligations:
+        // - n1 postcondition (1)
+        // - n2 precondition (1)
+        // - edge-crossing implication (1)
+        // - termination for Iterate (1)
+        let postconds = obs
+            .iter()
+            .filter(|o| o.kind == ObligationKind::Postcondition)
+            .count();
+        let preconds = obs
+            .iter()
+            .filter(|o| o.kind == ObligationKind::Precondition)
+            .count();
+        let terminations = obs
+            .iter()
+            .filter(|o| o.kind == ObligationKind::Termination)
+            .count();
+
+        assert_eq!(postconds, 1);
+        // 1 direct precondition + 1 edge-crossing implication
+        assert_eq!(preconds, 2);
+        assert_eq!(terminations, 1);
+        assert_eq!(obs.len(), 4);
     }
 }

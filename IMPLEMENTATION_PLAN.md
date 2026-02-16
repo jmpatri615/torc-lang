@@ -197,36 +197,36 @@ torc/
 
 ### Tasks
 
-- [ ] Implement `Contract` struct:
-  - [ ] `preconditions: Vec<Predicate>`
-  - [ ] `postconditions: Vec<Predicate>`
-  - [ ] `time_bound: Option<TimeBound>`
-  - [ ] `memory_bound: Option<MemoryBound>`
-  - [ ] `energy_bound: Option<EnergyBound>`
-  - [ ] `stack_bound: Option<StackBound>`
-  - [ ] `effects: EffectSet`
-  - [ ] `failure_modes: Vec<FailureMode>`
-  - [ ] `recovery_strategy: RecoveryStrategy`
-  - [ ] `proof_status: ProofStatus`
-  - [ ] `proof_witness: Option<ProofWitness>`
-- [ ] Implement the predicate language AST:
-  - [ ] Value constraints (`output >= 0 && output <= 4095`)
-  - [ ] Relational constraints (`output == f(input)`)
-  - [ ] Temporal constraints (`execution_time <= 50us`)
-  - [ ] Resource constraints (`heap_allocated == 0`)
-  - [ ] Invariant preservation (`sorted(output) && permutation(output, input)`)
-  - [ ] Information flow (`no_leak(secret_input, public_output)`)
-- [ ] Implement `ProofStatus` enum: `Verified`, `Assumed`, `Pending`, `Waived`
-- [ ] Implement `ProofWitness` structure (opaque proof object, content-addressed)
-- [ ] Implement `FailureMode` and `RecoveryStrategy` enums
-- [ ] Implement `EffectSet` (composable effect tracking)
-- [ ] Implement proof obligation generation from contracts:
-  - [ ] Type refinement obligations
-  - [ ] Pre/postcondition obligations
-  - [ ] Resource bound obligations (stubs — need target model)
-  - [ ] Linearity obligations
-  - [ ] Termination obligations
-- [ ] Implement `Waiver` struct with justification, author, approval, expiration
+- [x] Implement `Contract` struct:
+  - [x] `preconditions: Vec<Predicate>`
+  - [x] `postconditions: Vec<Predicate>`
+  - [x] `time_bound: Option<TimeBound>`
+  - [x] `memory_bound: Option<MemoryBound>`
+  - [x] `energy_bound: Option<EnergyBound>`
+  - [x] `stack_bound: Option<StackBound>`
+  - [x] `effects: EffectSet`
+  - [x] `failure_modes: Vec<FailureMode>`
+  - [x] `recovery_strategy: RecoveryStrategy`
+  - [x] `proof_status: ProofStatus`
+  - [x] `proof_witness: Option<ProofWitness>`
+- [x] Implement the predicate language AST:
+  - [x] Value constraints (`output >= 0 && output <= 4095`)
+  - [x] Relational constraints (`output == f(input)`)
+  - [x] Temporal constraints (`execution_time <= 50us`)
+  - [x] Resource constraints (`heap_allocated == 0`)
+  - [x] Invariant preservation (`sorted(output) && permutation(output, input)`)
+  - [x] Information flow (`no_leak(secret_input, public_output)`)
+- [x] Implement `ProofStatus` enum: `Verified`, `Assumed`, `Pending`, `Waived`
+- [x] Implement `ProofWitness` structure (opaque proof object, content-addressed)
+- [x] Implement `FailureMode` and `RecoveryStrategy` enums
+- [x] Implement `EffectSet` (composable effect tracking)
+- [x] Implement proof obligation generation from contracts:
+  - [x] Type refinement obligations
+  - [x] Pre/postcondition obligations
+  - [x] Resource bound obligations (stubs — need target model)
+  - [x] Linearity obligations
+  - [x] Termination obligations
+- [x] Implement `Waiver` struct with justification, author, approval, expiration
 
 ### Acceptance Criteria
 

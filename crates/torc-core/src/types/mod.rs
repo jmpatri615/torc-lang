@@ -165,6 +165,16 @@ impl Predicate {
         )
     }
 
+    /// Combine two predicates with logical AND.
+    /// Simplifies trivially: conjoin with True returns the other.
+    pub fn conjoin(self, other: Predicate) -> Predicate {
+        match (&self, &other) {
+            (Predicate::BoolLit(true), _) => other,
+            (_, Predicate::BoolLit(true)) => self,
+            _ => Predicate::And(Box::new(self), Box::new(other)),
+        }
+    }
+
     /// Convenience: `value > 0`.
     pub fn positive(var: &str) -> Self {
         Predicate::Gt(
@@ -742,6 +752,32 @@ mod tests {
         // Bandwidth<Powered<u8>> peels to u8
         let bw = Type::u8().powered(50).bandwidth(1000);
         assert_eq!(*bw.base_type(), Type::u8());
+    }
+
+    #[test]
+    fn predicate_conjoin_simplifies() {
+        let trivial = Predicate::BoolLit(true);
+        let pred = Predicate::positive("x");
+
+        // true AND p => p
+        let result = trivial.clone().conjoin(pred.clone());
+        assert_eq!(result, pred);
+
+        // p AND true => p
+        let result2 = pred.clone().conjoin(Predicate::BoolLit(true));
+        assert_eq!(result2, pred);
+    }
+
+    #[test]
+    fn predicate_conjoin_both_nontrivial() {
+        let a = Predicate::positive("x");
+        let b = Predicate::positive("y");
+        let result = a.clone().conjoin(b.clone());
+        assert!(matches!(result, Predicate::And(..)));
+        if let Predicate::And(lhs, rhs) = result {
+            assert_eq!(*lhs, a);
+            assert_eq!(*rhs, b);
+        }
     }
 
     #[test]
