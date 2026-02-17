@@ -36,3 +36,10 @@ pub use transform::{
     GraphTransform, IdentityTransform, LoweringResult, NodeLowering, TransformRegistry,
     TransformStats,
 };
+
+/// Whether LLVM code generation support is compiled in.
+#[cfg(feature = "llvm")]
+pub const LLVM_AVAILABLE: bool = true;
+/// Whether LLVM code generation support is compiled in.
+#[cfg(not(feature = "llvm"))]
+pub const LLVM_AVAILABLE: bool = false;

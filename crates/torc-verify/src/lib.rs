@@ -13,3 +13,10 @@ pub mod report;
 pub mod smt;
 pub mod structural;
 pub mod witness;
+
+/// Whether Z3 SMT solver support is compiled in.
+#[cfg(feature = "z3")]
+pub const Z3_AVAILABLE: bool = true;
+/// Whether Z3 SMT solver support is compiled in.
+#[cfg(not(feature = "z3"))]
+pub const Z3_AVAILABLE: bool = false;
