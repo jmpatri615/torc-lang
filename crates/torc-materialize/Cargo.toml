@@ -10,3 +10,5 @@ torc-core = { workspace = true }
 torc-verify = { workspace = true }
 torc-targets = { workspace = true }
 thiserror = { workspace = true }
+uuid = { workspace = true }
+serde = { workspace = true }

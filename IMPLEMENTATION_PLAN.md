@@ -1,8 +1,8 @@
 # Torc Implementation Plan
 
 **Version:** 0.1.0
-**Last Updated:** 2026-02-15
-**Status:** Phase 6 — Complete
+**Last Updated:** 2026-02-16
+**Status:** Phase 7 Pass 1 — Complete
 
 ---
 
@@ -25,8 +25,8 @@ The reference implementation is written in **Rust**, chosen for its memory safet
 | 4 | TRC Binary Format | Serialization/deserialization of .trc files | **Complete** |
 | 5 | Graph Construction API | Programmatic API for building graphs | **Complete** |
 | 6 | Verification Framework | SMT integration, structural analysis, proof caching | **Complete** |
-| 7 | Materialization Engine | Graph-to-executable pipeline via LLVM | Not Started |
-| 8 | Target Platform Models | ISA, microarchitecture, environment model parsing | Not Started |
+| 7 | Materialization Engine | Graph-to-executable pipeline via LLVM | **Pass 1 Complete** |
+| 8 | Target Platform Models | ISA, microarchitecture, environment model parsing | **Pass 1 Complete** |
 | 9 | CLI Tool (`torc`) | Unified command-line interface | Not Started |
 | 10 | Observability Layer | Projection views, pseudo-code generation | Not Started |
 | 11 | FFI Bridge | C interop (Rust interop stretch goal) | Not Started |
@@ -366,32 +366,33 @@ torc/
 
 ### Sub-phases
 
-#### Phase 7a: Graph Canonicalization
-- [ ] Subgraph deduplication via content hashing
-- [ ] Trivial subgraph inlining
-- [ ] Region flattening
+#### Phase 7a: Graph Canonicalization (Pass 1 — Complete)
+- [x] Subgraph deduplication via content hashing
+- [x] Trivial subgraph inlining
+- [x] Region flattening (same-kind nesting only)
 - [ ] Module reference resolution and linking
 
-#### Phase 7b: Verification Integration
-- [ ] Wire up Phase 6 verification as a materialization gate
-- [ ] Implement the "halt on unproven obligation" logic
-- [ ] Implement waiver-aware gating
+#### Phase 7b: Verification Integration (Pass 1 — Complete)
+- [x] Wire up Phase 6 verification as a materialization gate
+- [x] Implement the "halt on unproven obligation" logic
+- [x] Implement waiver-aware gating
 
-#### Phase 7c: Target-Aware Graph Transformation
-- [ ] Node lowering (abstract -> target-specific implementations)
+#### Phase 7c: Target-Aware Graph Transformation (Pass 1 — Complete)
+- [x] Node lowering trait definitions (`NodeLowering`, `GraphTransform`)
+- [x] Transform registry with `IdentityTransform` for testing
 - [ ] Generic specialization / monomorphization
-- [ ] Execution scheduling (topological order with parallelism)
-- [ ] Memory layout assignment
+- [x] Execution scheduling (topological order with parallelism)
+- [x] Memory layout estimation (heuristic, no LLVM)
 - [ ] ABI conformance (calling convention adaptation)
 
-#### Phase 7d: Resource Fitting
-- [ ] Flash/ROM size checking
-- [ ] RAM (static + stack + heap) checking
-- [ ] Stack depth analysis
+#### Phase 7d: Resource Fitting (Pass 1 — Complete)
+- [x] Flash/ROM size checking
+- [x] RAM (static + stack + heap) checking
+- [x] Stack depth analysis (heuristic)
 - [ ] WCET analysis integration (basic, for known targets)
 - [ ] Backtracking on resource constraint violation
 
-#### Phase 7e: LLVM Code Emission
+#### Phase 7e: LLVM Code Emission (Pass 2 — Not Started)
 - [ ] Integrate LLVM via `inkwell` (Rust LLVM bindings) or `llvm-sys`
 - [ ] Torc Target IR -> LLVM IR translation
 - [ ] LLVM optimization pass configuration per profile
@@ -399,10 +400,15 @@ torc/
 - [ ] ELF emission for Linux ARM64
 - [ ] Bare-metal ELF for ARM Cortex-M
 
-#### Phase 7f: Post-Materialization Verification
+#### Phase 7f: Post-Materialization Verification (Pass 2 — Not Started)
 - [ ] Binary size verification against predictions
 - [ ] Symbol table validation
 - [ ] Smoke test generation from contracts (stretch)
+
+#### Pass 1 Summary
+- `torc-materialize`: 9 modules (error, canonicalize, gate, transform, schedule, layout, resource, report, pipeline)
+- `materialize()` orchestrator: canonicalize → verify gate → transform → schedule + layout + resource fit → report
+- 30 tests, 0 clippy warnings
 
 ### Key Dependencies
 
@@ -427,14 +433,21 @@ torc/
 - [ ] Define TOML schema for ISA models
 - [ ] Define TOML schema for microarchitecture models
 - [ ] Define TOML schema for environment models
-- [ ] Implement model parsing and validation
-- [ ] Implement model composition (ISA + uarch + env = platform)
-- [ ] Create reference models:
-  - [ ] `linux-x86_64-gnu` (initial primary target)
+- [ ] Implement model parsing and validation (from TOML files)
+- [x] Implement model composition (ISA + uarch + env = platform)
+- [x] Create reference models:
+  - [x] `linux-x86_64` (Platform::generic_linux_x86_64)
   - [ ] `linux-aarch64-gnu`
-  - [ ] `bare-metal-arm-cortex-m4f`
+  - [x] `bare-metal-arm-cortex-m4f` (Platform::stm32f407_discovery)
 - [ ] Implement `torc target describe` output
-- [ ] Implement resource constraint extraction from models (for Phase 7d)
+- [x] Implement resource constraint extraction from models (for Phase 7d)
+
+### Pass 1 Summary
+- `torc-targets`: 4 modules (isa, microarch, environment, platform)
+- 3-layer model: IsaModel + MicroarchModel + EnvironmentModel = Platform
+- Built-in constructors: x86_64, ARMv7-M, Cortex-M4, Linux, bare-metal ARM, STM32F407
+- ResourceConstraints derived from Platform for materialization
+- 9 tests, 0 clippy warnings
 
 ### Acceptance Criteria
 

@@ -7,7 +7,12 @@
 //! - **Microarchitecture Model:** Pipeline, cache, timing behavior
 //! - **Environment Model:** OS, runtime, memory map, ABI
 
+pub mod environment;
 pub mod isa;
 pub mod microarch;
-pub mod environment;
 pub mod platform;
+
+pub use environment::{BinaryFormat, EnvironmentModel, EnvironmentType, MemoryRegion};
+pub use isa::{CallingConvention, Endianness, IsaModel, RegisterClass};
+pub use microarch::{MemoryTiming, MicroarchModel, PipelineModel};
+pub use platform::{Platform, ResourceConstraints};
