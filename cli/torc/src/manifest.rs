@@ -138,12 +138,18 @@ pub struct FfiTrustPolicy {
     pub platform_trusted: Vec<String>,
 }
 
-/// Registry configuration section (parsed but unused until Phase 12).
+/// Registry configuration section.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegistryConfig {
     /// Registry URL to publish to.
-    #[serde(default)]
+    #[serde(default, rename = "publish-to", alias = "publish_to")]
     pub publish_to: Option<String>,
+    /// Local registry path (for development/testing).
+    #[serde(default, rename = "local-path")]
+    pub local_path: Option<String>,
+    /// Whether to reject unsigned dependencies.
+    #[serde(default, rename = "reject-unsigned")]
+    pub reject_unsigned: Option<bool>,
 }
 
 impl TorcManifest {
@@ -273,7 +279,11 @@ publish_to = "https://registry.torc-lang.org"
             Some("integration")
         );
         assert!(manifest.ffi.is_some());
-        assert!(manifest.registry.is_some());
+        let reg = manifest.registry.as_ref().unwrap();
+        assert_eq!(
+            reg.publish_to.as_deref(),
+            Some("https://registry.torc-lang.org")
+        );
     }
 
     #[test]

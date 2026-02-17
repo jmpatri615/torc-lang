@@ -41,3 +41,4 @@ inkwell = { version = "0.8", features = ["llvm18-1", "llvm18-1-prefer-dynamic"] 
 clap = { version = "4", features = ["derive"] }
 toml = "0.8"
 tempfile = "3"
+semver = { version = "1", features = ["serde"] }

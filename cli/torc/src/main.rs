@@ -103,6 +103,34 @@ enum Commands {
         #[command(subcommand)]
         action: FfiAction,
     },
+    /// Add a dependency
+    Add {
+        /// Module name
+        name: String,
+        /// Version requirement (e.g., ">=1.0.0", "^1.2")
+        #[arg(long)]
+        version: Option<String>,
+    },
+    /// Remove a dependency
+    Remove {
+        /// Module name
+        name: String,
+    },
+    /// Update dependencies
+    Update {
+        /// Specific module to update (all if omitted)
+        name: Option<String>,
+    },
+    /// Show dependency tree
+    Tree,
+    /// Publish module to registry
+    Publish {
+        /// Validate without publishing
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Audit dependencies for safety and compliance
+    Audit,
 }
 
 #[derive(Subcommand)]
@@ -269,6 +297,47 @@ fn run(cli: Cli) -> anyhow::Result<()> {
                 }
             }
         },
+
+        Commands::Add { name, version } => {
+            let (manifest, project_dir) = load_manifest_required(&cwd)?;
+            commands::registry::add(&project_dir, &manifest, &name, version.as_deref())
+        }
+
+        Commands::Remove { name } => {
+            let (_, project_dir) = load_manifest_optional(&cwd)?;
+            let project_dir = project_dir.unwrap_or(cwd);
+            commands::registry::remove(&project_dir, &name)
+        }
+
+        Commands::Update { name } => {
+            let (manifest, project_dir) = load_manifest_required(&cwd)?;
+            commands::registry::update(&project_dir, &manifest, name.as_deref())
+        }
+
+        Commands::Tree => {
+            let (manifest, project_dir) = load_manifest_required(&cwd)?;
+            commands::registry::tree(&project_dir, &manifest)
+        }
+
+        Commands::Publish { dry_run } => {
+            let (manifest, project_dir) = load_manifest_required(&cwd)?;
+            commands::registry::publish(&project_dir, &manifest, dry_run)
+        }
+
+        Commands::Audit => {
+            let (manifest, project_dir) = load_manifest_required(&cwd)?;
+            commands::registry::audit(&project_dir, &manifest)
+        }
+    }
+}
+
+/// Load manifest, returning error if not found.
+fn load_manifest_required(
+    cwd: &Path,
+) -> anyhow::Result<(TorcManifest, PathBuf)> {
+    match TorcManifest::find_and_load(cwd)? {
+        Some((manifest, dir)) => Ok((manifest, dir)),
+        None => anyhow::bail!("no torc.toml found (run `torc init` first)"),
     }
 }
 
@@ -498,6 +567,71 @@ trust_level = "unsafe"
             "danger.ffi.toml",
         );
         assert!(result.is_err(), "unsafe should be rejected by policy");
+    }
+
+    /// Registry: add and remove dependencies.
+    #[test]
+    fn registry_add_remove() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("reg-test");
+        commands::init::create_project(&project_path, "reg-test").unwrap();
+
+        let (manifest, _) = TorcManifest::find_and_load(&project_path).unwrap().unwrap();
+
+        // Add a dependency
+        commands::registry::add(&project_path, &manifest, "torc-math", Some(">=1.0.0")).unwrap();
+
+        // Re-read manifest and verify
+        let content = std::fs::read_to_string(project_path.join("torc.toml")).unwrap();
+        assert!(content.contains("torc-math"));
+
+        // Remove it
+        commands::registry::remove(&project_path, "torc-math").unwrap();
+
+        // Verify it's gone
+        let content = std::fs::read_to_string(project_path.join("torc.toml")).unwrap();
+        assert!(!content.contains("torc-math"));
+    }
+
+    /// Registry: tree with no dependencies.
+    #[test]
+    fn registry_tree_no_deps() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("tree-test");
+        commands::init::create_project(&project_path, "tree-test").unwrap();
+
+        let (manifest, _) = TorcManifest::find_and_load(&project_path).unwrap().unwrap();
+        commands::registry::tree(&project_path, &manifest).unwrap();
+    }
+
+    /// Registry: publish dry run.
+    #[test]
+    fn registry_publish_dry_run() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("pub-test");
+        commands::init::create_project(&project_path, "pub-test").unwrap();
+
+        let (manifest, _) = TorcManifest::find_and_load(&project_path).unwrap().unwrap();
+        commands::registry::publish(&project_path, &manifest, true).unwrap();
+    }
+
+    /// Registry config in manifest.
+    #[test]
+    fn registry_manifest_config() {
+        let toml_str = r#"
+[project]
+name = "reg-project"
+
+[registry]
+publish-to = "https://registry.torc-lang.org"
+local-path = ".torc-registry"
+reject-unsigned = true
+"#;
+        let manifest = TorcManifest::from_str(toml_str).unwrap();
+        let reg = manifest.registry.unwrap();
+        assert_eq!(reg.publish_to.as_deref(), Some("https://registry.torc-lang.org"));
+        assert_eq!(reg.local_path.as_deref(), Some(".torc-registry"));
+        assert_eq!(reg.reject_unsigned, Some(true));
     }
 
     /// FFI manifest with trust policy and declarations fields.
