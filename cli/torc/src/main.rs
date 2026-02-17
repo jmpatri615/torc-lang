@@ -66,14 +66,20 @@ enum Commands {
         #[arg(long)]
         incremental: bool,
     },
-    /// Inspect a Torc graph (not yet implemented)
+    /// Inspect a Torc graph
     Inspect {
-        /// View mode
+        /// View mode (pseudo-code, contracts, resources, dataflow, provenance)
         #[arg(long)]
         view: Option<String>,
         /// Input .trc file (default: graph/main.trc)
         #[arg(long)]
         input: Option<String>,
+        /// Output format (text, json)
+        #[arg(long)]
+        export: Option<String>,
+        /// Target platform (needed for resource budget view)
+        #[arg(long)]
+        target: Option<String>,
     },
     /// Manage target platforms
     Target {
@@ -175,10 +181,21 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             )
         }
 
-        Commands::Inspect { view, input } => {
+        Commands::Inspect {
+            view,
+            input,
+            export,
+            target,
+        } => {
             let (_, project_dir) = load_manifest_optional(&cwd)?;
             let project_dir = project_dir.unwrap_or(cwd);
-            commands::inspect::run(&project_dir, view.as_deref(), input.as_deref())
+            commands::inspect::run(
+                &project_dir,
+                view.as_deref(),
+                input.as_deref(),
+                export.as_deref(),
+                target.as_deref(),
+            )
         }
 
         Commands::Target { action } => match action {
