@@ -10,6 +10,7 @@ members = [
     "crates/torc-observe",
     "crates/torc-registry",
     "cli/torc",
+    "examples/foc-controller",
 ]
 
 [workspace.package]
