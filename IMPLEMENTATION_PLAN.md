@@ -2,7 +2,7 @@
 
 **Version:** 0.1.0
 **Last Updated:** 2026-02-15
-**Status:** Phase 5 — Complete
+**Status:** Phase 6 — Complete
 
 ---
 
@@ -24,7 +24,7 @@ The reference implementation is written in **Rust**, chosen for its memory safet
 | 3 | Contract System | Contracts, predicates, proof obligations | **Complete** |
 | 4 | TRC Binary Format | Serialization/deserialization of .trc files | **Complete** |
 | 5 | Graph Construction API | Programmatic API for building graphs | **Complete** |
-| 6 | Verification Framework | SMT integration, structural analysis, proof caching | Not Started |
+| 6 | Verification Framework | SMT integration, structural analysis, proof caching | **Complete** |
 | 7 | Materialization Engine | Graph-to-executable pipeline via LLVM | Not Started |
 | 8 | Target Platform Models | ISA, microarchitecture, environment model parsing | Not Started |
 | 9 | CLI Tool (`torc`) | Unified command-line interface | Not Started |
@@ -319,31 +319,31 @@ torc/
 
 ### Tasks
 
-- [ ] Implement proof obligation registry (collect, track, cache)
-- [ ] Implement structural analysis engine:
-  - [ ] Linearity verification (graph structure only, no SMT)
-  - [ ] Effect propagation verification
-  - [ ] Graph well-formedness
-  - [ ] Ownership tracking
-- [ ] Integrate Z3 SMT solver:
-  - [ ] Rust bindings (via `z3` crate or `z3-sys`)
-  - [ ] Translate predicate AST to Z3 assertions
-  - [ ] Handle solver results (sat/unsat/unknown/timeout)
-  - [ ] Extract counterexamples on failure
-- [ ] Implement abstract interpretation (basic):
-  - [ ] Numeric range analysis (interval domain)
-  - [ ] Used for pre-screening before SMT
-- [ ] Implement proof witness generation and storage
-- [ ] Implement proof caching (content-addressed, incremental)
-- [ ] Implement verification reporting:
-  - [ ] Summary statistics
-  - [ ] Detailed failure diagnostics with counterexamples
-  - [ ] Suggestion generation (clamp, strengthen pre, weaken post, waive)
-- [ ] Implement verification profiles:
-  - [ ] `development` (fast, incremental, skip WCET)
-  - [ ] `integration` (full, with WCET)
-  - [ ] `certification` (exhaustive, independent proof checking)
-- [ ] Implement waiver management
+- [x] Implement proof obligation registry (collect, track, cache)
+- [x] Implement structural analysis engine:
+  - [x] Linearity verification (graph structure only, no SMT)
+  - [x] Effect propagation verification
+  - [x] Graph well-formedness
+  - [x] Ownership tracking
+- [x] Integrate Z3 SMT solver:
+  - [x] Rust bindings (via `z3` crate, feature-gated)
+  - [x] Translate predicate AST to Z3 assertions
+  - [x] Handle solver results (sat/unsat/unknown/timeout)
+  - [x] Extract counterexamples on failure
+- [x] Implement abstract interpretation (basic):
+  - [x] Numeric range analysis (interval domain)
+  - [x] Used for pre-screening before SMT
+- [x] Implement proof witness generation and storage
+- [x] Implement proof caching (content-addressed, incremental)
+- [x] Implement verification reporting:
+  - [x] Summary statistics
+  - [x] Detailed failure diagnostics with counterexamples
+  - [x] Suggestion generation (clamp, strengthen pre, weaken post, waive)
+- [x] Implement verification profiles:
+  - [x] `development` (fast, incremental, skip WCET)
+  - [x] `integration` (full, with WCET)
+  - [x] `certification` (exhaustive, independent proof checking)
+- [x] Implement waiver management
 
 ### Key Dependencies
 
