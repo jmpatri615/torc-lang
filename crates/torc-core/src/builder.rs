@@ -176,6 +176,31 @@ impl GraphBuilder {
         self.add_node(NodeKind::FFICall, name)
     }
 
+    /// Add a switch (multi-way branch) node.
+    pub fn add_switch(&mut self, name: &str) -> NodeId {
+        self.add_node(NodeKind::Switch, name)
+    }
+
+    /// Add an iterate (loop) node.
+    pub fn add_iterate(&mut self, name: &str) -> NodeId {
+        self.add_node(NodeKind::Iterate, name)
+    }
+
+    /// Add a recurse node.
+    pub fn add_recurse(&mut self, name: &str) -> NodeId {
+        self.add_node(NodeKind::Recurse, name)
+    }
+
+    /// Add a read (memory/IO) node.
+    pub fn add_read(&mut self, name: &str) -> NodeId {
+        self.add_node(NodeKind::Read, name)
+    }
+
+    /// Add a write (memory/IO) node.
+    pub fn add_write(&mut self, name: &str) -> NodeId {
+        self.add_node(NodeKind::Write, name)
+    }
+
     // === Edge construction ===
 
     /// Connect an output port of one node to an input port of another.
@@ -576,6 +601,103 @@ mod tests {
         let graph = b.build().unwrap();
         let region = graph.get_region(&rid).unwrap();
         assert_eq!(region.interfaces.len(), 2);
+    }
+
+    #[test]
+    fn safety_monitor() {
+        use crate::contract::{Contract, EffectSet};
+        use crate::types::Effect;
+
+        let mut b = GraphBuilder::new();
+
+        // 5 input literals
+        let ia = b.add_literal("ia");
+        let ib = b.add_literal("ib");
+        let ic = b.add_literal("ic");
+        let dc_bus = b.add_literal("dc_bus_voltage");
+        let motor_temp = b.add_literal("motor_temp");
+
+        // Overcurrent thresholds
+        let oc_thresh_a = b.add_literal("oc_thresh_a");
+        let oc_thresh_b = b.add_literal("oc_thresh_b");
+        let oc_thresh_c = b.add_literal("oc_thresh_c");
+
+        // Overvoltage / overtemperature thresholds
+        let ov_thresh = b.add_literal("ov_thresh");
+        let ot_thresh = b.add_literal("ot_thresh");
+
+        // 3 parallel overcurrent comparisons
+        b.begin_region(RegionKind::Parallel);
+        let oc_a = b.add_comparison(ComparisonOp::Gt, "oc_a");
+        let oc_b = b.add_comparison(ComparisonOp::Gt, "oc_b");
+        let oc_c = b.add_comparison(ComparisonOp::Gt, "oc_c");
+        let parallel_rid = b.end_region().unwrap();
+        let _ = parallel_rid;
+
+        // Combine overcurrent flags: OR
+        let oc_any = b.add_bitwise(BitwiseOp::Or, "oc_any");
+
+        // Overvoltage and overtemperature
+        let overvoltage = b.add_comparison(ComparisonOp::Gt, "overvoltage");
+        let overtemp = b.add_comparison(ComparisonOp::Gt, "overtemp");
+
+        // Switch node for state machine
+        let state = b.add_switch("fault_state");
+
+        // Write node for GPIO fault pin
+        let gpio_write = b.add_write("gpio_fault_pin");
+
+        // Set IO effect contract on write node
+        let io_contract = Contract::pure_default()
+            .with_effects(EffectSet::from_effects(vec![Effect::IO(
+                "GPIO_FAULT_PIN".into(),
+            )]));
+        b.set_contract(gpio_write, io_contract).unwrap();
+
+        // Connect overcurrent comparisons
+        b.connect(ia, 0, oc_a, 0).unwrap();
+        b.connect(oc_thresh_a, 0, oc_a, 1).unwrap();
+        b.connect(ib, 0, oc_b, 0).unwrap();
+        b.connect(oc_thresh_b, 0, oc_b, 1).unwrap();
+        b.connect(ic, 0, oc_c, 0).unwrap();
+        b.connect(oc_thresh_c, 0, oc_c, 1).unwrap();
+
+        // OR all 3 overcurrent flags into one combined signal
+        b.connect(oc_a, 0, oc_any, 0).unwrap();
+        b.connect(oc_b, 0, oc_any, 1).unwrap();
+        b.connect(oc_c, 0, oc_any, 2).unwrap();
+
+        // Overvoltage / overtemperature
+        b.connect(dc_bus, 0, overvoltage, 0).unwrap();
+        b.connect(ov_thresh, 0, overvoltage, 1).unwrap();
+        b.connect(motor_temp, 0, overtemp, 0).unwrap();
+        b.connect(ot_thresh, 0, overtemp, 1).unwrap();
+
+        // All fault signals -> switch
+        b.connect(oc_any, 0, state, 0).unwrap();
+        b.connect(overvoltage, 0, state, 1).unwrap();
+        b.connect(overtemp, 0, state, 2).unwrap();
+
+        // Switch -> GPIO write
+        b.connect(state, 0, gpio_write, 0).unwrap();
+
+        let graph = b.build().unwrap();
+
+        // 18 nodes: 5 inputs + 5 thresholds + 3 oc comparisons + 1 OR
+        //           + 1 overvoltage + 1 overtemp + 1 switch + 1 write
+        assert_eq!(graph.node_count(), 18);
+        assert_eq!(graph.edge_count(), 17);
+        assert_eq!(graph.region_count(), 1);
+
+        // Topological sort succeeds (it's a DAG)
+        let order = graph.topological_sort().unwrap();
+        assert_eq!(order.len(), 18);
+
+        // Write node has the IO contract
+        let write_node = graph.get_node(&gpio_write).unwrap();
+        assert!(write_node.contract.is_some());
+        let effects = &write_node.contract.as_ref().unwrap().effects;
+        assert!(effects.has_effect(&Effect::IO("GPIO_FAULT_PIN".into())));
     }
 
     #[test]

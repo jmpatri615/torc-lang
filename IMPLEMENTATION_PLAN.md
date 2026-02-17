@@ -2,7 +2,7 @@
 
 **Version:** 0.1.0
 **Last Updated:** 2026-02-15
-**Status:** Phase 4 — Complete
+**Status:** Phase 5 — Complete
 
 ---
 
@@ -23,7 +23,7 @@ The reference implementation is written in **Rust**, chosen for its memory safet
 | 2 | Type System | Full type universe implementation | **Complete** |
 | 3 | Contract System | Contracts, predicates, proof obligations | **Complete** |
 | 4 | TRC Binary Format | Serialization/deserialization of .trc files | **Complete** |
-| 5 | Graph Construction API | Programmatic API for building graphs | Not Started |
+| 5 | Graph Construction API | Programmatic API for building graphs | **Complete** |
 | 6 | Verification Framework | SMT integration, structural analysis, proof caching | Not Started |
 | 7 | Materialization Engine | Graph-to-executable pipeline via LLVM | Not Started |
 | 8 | Target Platform Models | ISA, microarchitecture, environment model parsing | Not Started |
@@ -281,34 +281,35 @@ torc/
 
 ### Tasks
 
-- [ ] Design the builder API (`GraphBuilder`):
-  - [ ] `add_node(kind, type_sig, contract) -> NodeId`
-  - [ ] `add_edge(source, target, edge_type) -> EdgeId`
-  - [ ] `begin_region(kind) / end_region() -> RegionId`
-  - [ ] `add_annotation(node_id, key, value)`
-  - [ ] `set_provenance(node_id, provenance)`
-- [ ] Implement validation during construction:
-  - [ ] Type checking on edge creation
-  - [ ] Linearity checking
-  - [ ] Region containment enforcement
-- [ ] Implement graph manipulation:
-  - [ ] Replace subgraph
-  - [ ] Inline region
-  - [ ] Extract subgraph as module
-  - [ ] Graph composition (connect two graphs at interface ports)
-- [ ] Implement a convenience layer for common patterns:
-  - [ ] Arithmetic expressions
-  - [ ] Conditional selection
-  - [ ] Iteration construction
-  - [ ] FFI call wrapping
-- [ ] Design and document the API surface for AI consumers
+- [x] Design the builder API (`GraphBuilder`):
+  - [x] `add_node(kind, type_sig, contract) -> NodeId`
+  - [x] `add_edge(source, target, edge_type) -> EdgeId`
+  - [x] `begin_region(kind) / end_region() -> RegionId`
+  - [x] `add_annotation(node_id, key, value)`
+  - [x] `set_provenance(node_id, provenance)`
+- [x] Implement validation during construction:
+  - [x] Type checking on edge creation
+  - [x] Linearity checking
+  - [x] Region containment enforcement
+- [x] Implement graph manipulation:
+  - [x] Replace subgraph
+  - [x] Inline region
+  - [x] Extract subgraph as module
+  - [x] Graph composition (connect two graphs at interface ports)
+- [x] Implement a convenience layer for common patterns:
+  - [x] Arithmetic expressions
+  - [x] Conditional selection
+  - [x] Iteration construction
+  - [x] FFI call wrapping
+- [x] Graph removal primitives (`remove_node`, `remove_edge`, `remove_region`)
+- [x] Additional convenience constructors (`add_switch`, `add_iterate`, `add_recurse`, `add_read`, `add_write`)
 
 ### Acceptance Criteria
 
-- Can build the Clarke transform example from spec section 12 using the API
-- Can build the safety monitor example from spec section 12
-- Invalid constructions are rejected with clear error messages
-- API is ergonomic for programmatic (non-human) use
+- [x] Can build the Clarke transform example from spec section 12 using the API
+- [x] Can build the safety monitor example from spec section 12
+- [x] Invalid constructions are rejected with clear error messages
+- [x] API is ergonomic for programmatic (non-human) use
 
 ---
 

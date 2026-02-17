@@ -10,7 +10,7 @@ Instead, Torc represents programs as directed semantic graphs with rich type ann
 
 Torc is not a language humans write directly. It has no syntax in the traditional sense — no keywords, no operator precedence, no formatting conventions. An AI system constructs Torc programs by building and manipulating graph structures through the Torc API. Humans interact with Torc programs through an observability layer that projects the graph into human-comprehensible views: dependency diagrams, property summaries, resource budgets, and when necessary, pseudo-code approximations.
 
-Torc is also not a purely theoretical exercise. It is designed to target real hardware that exists today — x86_64, ARM64, ARMv7, RISC-V, PowerPC — through real platform environments including Linux, Windows, macOS, bare-metal RTOS, and AUTOSAR. It achieves this by using LLVM as its initial materialization backend while maintaining the ability to adopt or develop native backends as the ecosystem matures.
+Torc is also not a purely theoretical exercise. It is designed to target real hardware that exists today — x86_64, ARM64, ARMv7, RISC-V, PowerPC — through real platform environments including Linux, Windows, macOS, and bare-metal RTOS. It achieves this by using LLVM as its initial materialization backend while maintaining the ability to adopt or develop native backends as the ecosystem matures.
 
 ## Why Now
 

@@ -18,13 +18,14 @@ use thiserror::Error;
 
 use std::collections::HashSet;
 
+use self::constraints::{BandwidthConstraint, Lifetime};
 use self::edge::{Edge, EdgeId};
 use self::node::{Node, NodeId, NodeKind};
 use self::region::{Region, RegionId};
 
 use crate::contract::{EffectSet, ObligationKind, ProofObligation, ProofStatus};
 use crate::types::check::types_compatible;
-use crate::types::{Linearity, Predicate};
+use crate::types::{Linearity, Predicate, Type};
 
 /// Errors that can occur during graph construction or validation.
 #[derive(Debug, Error)]
@@ -83,6 +84,45 @@ pub enum GraphError {
 
     #[error("merge conflict: duplicate {kind} id {id}")]
     MergeConflict { kind: String, id: uuid::Uuid },
+
+    #[error("incomplete port mapping: unmapped boundary port ({node}, {port})")]
+    UnmappedBoundaryPort { node: NodeId, port: usize },
+}
+
+/// Direction of a boundary edge relative to a module.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BoundaryDirection {
+    /// Edge flows into the module (external source → internal target).
+    In,
+    /// Edge flows out of the module (internal source → external target).
+    Out,
+}
+
+/// A boundary edge that crosses a module boundary.
+#[derive(Debug, Clone)]
+pub struct BoundaryEdge {
+    /// Node inside the module.
+    pub internal_node: NodeId,
+    /// Port on the internal node.
+    pub internal_port: usize,
+    /// Node outside the module.
+    pub external_node: NodeId,
+    /// Port on the external node.
+    pub external_port: usize,
+    /// Data type flowing on this edge.
+    pub data_type: Option<Type>,
+    /// Direction relative to the module.
+    pub direction: BoundaryDirection,
+}
+
+/// A module extracted from a graph, with boundary information.
+pub struct ModuleInterface {
+    /// The internal subgraph.
+    pub graph: Graph,
+    /// Edges flowing into the module.
+    pub inputs: Vec<BoundaryEdge>,
+    /// Edges flowing out of the module.
+    pub outputs: Vec<BoundaryEdge>,
 }
 
 /// The core graph container for a Torc program.
@@ -801,6 +841,326 @@ impl Graph {
         }
         for (child_id, parent_id) in &other.region_parent {
             self.region_parent.insert(*child_id, *parent_id);
+        }
+
+        Ok(())
+    }
+
+    /// Remove an edge from the graph.
+    ///
+    /// Removes the edge from the `edges` map and from the source/target
+    /// outgoing/incoming index lists.
+    pub fn remove_edge(&mut self, id: EdgeId) -> Result<(), GraphError> {
+        let edge = self.edges.remove(&id).ok_or(GraphError::EdgeNotFound(id))?;
+        if let Some(list) = self.outgoing.get_mut(&edge.source.0) {
+            list.retain(|&eid| eid != id);
+        }
+        if let Some(list) = self.incoming.get_mut(&edge.target.0) {
+            list.retain(|&eid| eid != id);
+        }
+        Ok(())
+    }
+
+    /// Remove a node and all its connected edges from the graph.
+    ///
+    /// Also removes the node from its containing region if any.
+    pub fn remove_node(&mut self, id: NodeId) -> Result<(), GraphError> {
+        if !self.nodes.contains_key(&id) {
+            return Err(GraphError::NodeNotFound(id));
+        }
+
+        // Collect all connected edge IDs
+        let out_edges: Vec<EdgeId> = self.outgoing.get(&id).cloned().unwrap_or_default();
+        let in_edges: Vec<EdgeId> = self.incoming.get(&id).cloned().unwrap_or_default();
+
+        // Remove each edge (cleans up the other endpoint's index)
+        for eid in out_edges {
+            // Remove from edges map and target's incoming list
+            if let Some(edge) = self.edges.remove(&eid) {
+                if let Some(list) = self.incoming.get_mut(&edge.target.0) {
+                    list.retain(|&e| e != eid);
+                }
+            }
+        }
+        for eid in in_edges {
+            if let Some(edge) = self.edges.remove(&eid) {
+                if let Some(list) = self.outgoing.get_mut(&edge.source.0) {
+                    list.retain(|&e| e != eid);
+                }
+            }
+        }
+
+        // Remove from indexes
+        self.outgoing.remove(&id);
+        self.incoming.remove(&id);
+
+        // Remove from region membership
+        if let Some(region_id) = self.node_region.remove(&id) {
+            if let Some(children) = self.region_children.get_mut(&region_id) {
+                children.retain(|&nid| nid != id);
+            }
+            if let Some(region) = self.regions.get_mut(&region_id) {
+                region.children.retain(|&nid| nid != id);
+            }
+        }
+
+        self.nodes.remove(&id);
+        Ok(())
+    }
+
+    /// Remove a region from the graph.
+    ///
+    /// Child nodes become regionless. Child sub-regions lose their parent.
+    pub fn remove_region(&mut self, id: RegionId) -> Result<(), GraphError> {
+        if !self.regions.contains_key(&id) {
+            return Err(GraphError::RegionNotFound(id));
+        }
+
+        // Clear node_region for child nodes
+        if let Some(children) = self.region_children.remove(&id) {
+            for child_id in children {
+                self.node_region.remove(&child_id);
+            }
+        }
+
+        // Child sub-regions whose parent is this region: clear parent
+        let child_region_ids: Vec<RegionId> = self
+            .region_parent
+            .iter()
+            .filter(|(_, &parent)| parent == id)
+            .map(|(&child, _)| child)
+            .collect();
+        for child_rid in child_region_ids {
+            self.region_parent.remove(&child_rid);
+            if let Some(region) = self.regions.get_mut(&child_rid) {
+                region.parent = None;
+            }
+        }
+
+        // If this region has a parent, remove from region_parent index
+        self.region_parent.remove(&id);
+
+        self.regions.remove(&id);
+        Ok(())
+    }
+
+    /// Flatten a region into its parent.
+    ///
+    /// Child nodes and sub-regions are promoted to the parent region (if any),
+    /// or become regionless (if the inlined region has no parent).
+    /// Edges between inlined nodes are preserved.
+    pub fn inline_region(&mut self, id: RegionId) -> Result<(), GraphError> {
+        let region = self
+            .regions
+            .get(&id)
+            .ok_or(GraphError::RegionNotFound(id))?;
+        let children = region.children.clone();
+        let parent = region.parent;
+
+        // Collect child sub-regions whose parent is this region
+        let child_sub_regions: Vec<RegionId> = self
+            .region_parent
+            .iter()
+            .filter(|(_, &p)| p == id)
+            .map(|(&c, _)| c)
+            .collect();
+
+        if let Some(parent_id) = parent {
+            // Promote children to parent region
+            for &child_id in &children {
+                self.node_region.insert(child_id, parent_id);
+                if let Some(parent_children) = self.region_children.get_mut(&parent_id) {
+                    parent_children.push(child_id);
+                }
+                if let Some(parent_region) = self.regions.get_mut(&parent_id) {
+                    parent_region.children.push(child_id);
+                }
+            }
+            // Reparent child sub-regions to parent
+            for child_rid in &child_sub_regions {
+                self.region_parent.insert(*child_rid, parent_id);
+                if let Some(region) = self.regions.get_mut(child_rid) {
+                    region.parent = Some(parent_id);
+                }
+            }
+        } else {
+            // No parent: children become regionless
+            for &child_id in &children {
+                self.node_region.remove(&child_id);
+            }
+            // Sub-regions lose their parent
+            for child_rid in &child_sub_regions {
+                self.region_parent.remove(child_rid);
+                if let Some(region) = self.regions.get_mut(child_rid) {
+                    region.parent = None;
+                }
+            }
+        }
+
+        // Remove the inlined region itself
+        self.region_children.remove(&id);
+        self.region_parent.remove(&id);
+        self.regions.remove(&id);
+        Ok(())
+    }
+
+    /// Merge another graph into this one and create edges between specified port pairs.
+    ///
+    /// Each connection specifies `((src_node, src_port), (dst_node, dst_port))`.
+    /// The source and target nodes may come from either graph.
+    pub fn compose(
+        &mut self,
+        other: &Graph,
+        connections: &[(edge::PortRef, edge::PortRef)],
+    ) -> Result<(), GraphError> {
+        self.merge(other)?;
+        for &((src_node, src_port), (dst_node, dst_port)) in connections {
+            let edge = Edge::new((src_node, src_port), (dst_node, dst_port));
+            self.add_edge(edge)?;
+        }
+        Ok(())
+    }
+
+    /// Extract a module (subgraph with boundary information) for the given nodes.
+    ///
+    /// Returns the internal subgraph plus lists of boundary edges
+    /// that cross the module boundary.
+    pub fn extract_module(&self, node_ids: &HashSet<NodeId>) -> ModuleInterface {
+        let graph = self.extract_subgraph(node_ids);
+
+        let mut inputs = Vec::new();
+        let mut outputs = Vec::new();
+
+        for edge in self.edges.values() {
+            let src_in = node_ids.contains(&edge.source.0);
+            let tgt_in = node_ids.contains(&edge.target.0);
+
+            match (src_in, tgt_in) {
+                (true, false) => {
+                    // Source inside, target outside → output
+                    outputs.push(BoundaryEdge {
+                        internal_node: edge.source.0,
+                        internal_port: edge.source.1,
+                        external_node: edge.target.0,
+                        external_port: edge.target.1,
+                        data_type: edge.data_type.clone(),
+                        direction: BoundaryDirection::Out,
+                    });
+                }
+                (false, true) => {
+                    // Source outside, target inside → input
+                    inputs.push(BoundaryEdge {
+                        internal_node: edge.target.0,
+                        internal_port: edge.target.1,
+                        external_node: edge.source.0,
+                        external_port: edge.source.1,
+                        data_type: edge.data_type.clone(),
+                        direction: BoundaryDirection::In,
+                    });
+                }
+                _ => {} // Both inside or both outside — skip
+            }
+        }
+
+        ModuleInterface {
+            graph,
+            inputs,
+            outputs,
+        }
+    }
+
+    /// Replace a set of nodes with a replacement graph, reconnecting boundary edges.
+    ///
+    /// `port_map` maps `(old_node, port)` → `(new_node, port)` for each boundary
+    /// edge endpoint that falls within `old_nodes`.
+    pub fn replace_subgraph(
+        &mut self,
+        old_nodes: &HashSet<NodeId>,
+        replacement: &Graph,
+        port_map: &HashMap<(NodeId, usize), (NodeId, usize)>,
+    ) -> Result<(), GraphError> {
+        // 1. Collect boundary edge descriptors before removing anything
+        struct BoundaryDescriptor {
+            external_endpoint: (NodeId, usize),
+            internal_is_source: bool,
+            new_endpoint: (NodeId, usize),
+            data_type: Option<Type>,
+            lifetime: Lifetime,
+            bandwidth: Option<BandwidthConstraint>,
+        }
+
+        let mut descriptors = Vec::new();
+
+        for edge in self.edges.values() {
+            let src_in = old_nodes.contains(&edge.source.0);
+            let tgt_in = old_nodes.contains(&edge.target.0);
+
+            match (src_in, tgt_in) {
+                (true, false) => {
+                    // Source is internal, target is external
+                    let new_ep = port_map
+                        .get(&(edge.source.0, edge.source.1))
+                        .ok_or(GraphError::UnmappedBoundaryPort {
+                            node: edge.source.0,
+                            port: edge.source.1,
+                        })?;
+                    descriptors.push(BoundaryDescriptor {
+                        external_endpoint: edge.target,
+                        internal_is_source: true,
+                        new_endpoint: *new_ep,
+                        data_type: edge.data_type.clone(),
+                        lifetime: edge.lifetime.clone(),
+                        bandwidth: edge.bandwidth.clone(),
+                    });
+                }
+                (false, true) => {
+                    // Target is internal, source is external
+                    let new_ep = port_map
+                        .get(&(edge.target.0, edge.target.1))
+                        .ok_or(GraphError::UnmappedBoundaryPort {
+                            node: edge.target.0,
+                            port: edge.target.1,
+                        })?;
+                    descriptors.push(BoundaryDescriptor {
+                        external_endpoint: edge.source,
+                        internal_is_source: false,
+                        new_endpoint: *new_ep,
+                        data_type: edge.data_type.clone(),
+                        lifetime: edge.lifetime.clone(),
+                        bandwidth: edge.bandwidth.clone(),
+                    });
+                }
+                _ => {} // Both inside or both outside
+            }
+        }
+
+        // 2. Validate that all mapped endpoints exist in the replacement graph
+        for desc in &descriptors {
+            if !replacement.nodes.contains_key(&desc.new_endpoint.0) {
+                return Err(GraphError::NodeNotFound(desc.new_endpoint.0));
+            }
+        }
+
+        // 3. Remove old nodes (this removes their edges and region membership)
+        let old_node_ids: Vec<NodeId> = old_nodes.iter().copied().collect();
+        for id in &old_node_ids {
+            self.remove_node(*id)?;
+        }
+
+        // 4. Merge replacement
+        self.merge(replacement)?;
+
+        // 5. Recreate boundary edges
+        for desc in descriptors {
+            let mut new_edge = if desc.internal_is_source {
+                Edge::new(desc.new_endpoint, desc.external_endpoint)
+            } else {
+                Edge::new(desc.external_endpoint, desc.new_endpoint)
+            };
+            new_edge.data_type = desc.data_type;
+            new_edge.lifetime = desc.lifetime;
+            new_edge.bandwidth = desc.bandwidth;
+            self.add_edge(new_edge)?;
         }
 
         Ok(())
@@ -1820,5 +2180,408 @@ mod tests {
         assert_eq!(preconds, 2);
         assert_eq!(terminations, 1);
         assert_eq!(obs.len(), 4);
+    }
+
+    #[test]
+    fn remove_node_basic() {
+        let mut g = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_arithmetic_node();
+        let n3 = make_literal_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        let id3 = n3.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_node(n3).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+        g.add_edge(Edge::new((id2, 0), (id3, 0))).unwrap();
+
+        g.remove_node(id2).unwrap();
+
+        assert_eq!(g.node_count(), 2);
+        assert_eq!(g.edge_count(), 0);
+        assert!(g.get_node(&id2).is_none());
+        assert!(g.outgoing_edges(&id1).is_empty());
+        assert!(g.incoming_edges(&id3).is_empty());
+    }
+
+    #[test]
+    fn remove_node_updates_region() {
+        let mut g = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_literal_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+
+        let r = Region::new(RegionKind::Parallel, vec![id1, id2]);
+        let rid = r.id;
+        g.add_region(r).unwrap();
+
+        g.remove_node(id1).unwrap();
+
+        assert_eq!(g.containing_region(&id1), None);
+        let region = g.get_region(&rid).unwrap();
+        assert_eq!(region.children.len(), 1);
+        assert!(!region.children.contains(&id1));
+    }
+
+    #[test]
+    fn remove_edge_basic() {
+        let mut g = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_arithmetic_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        let edge = Edge::new((id1, 0), (id2, 0));
+        let eid = edge.id;
+        g.add_edge(edge).unwrap();
+
+        g.remove_edge(eid).unwrap();
+
+        assert_eq!(g.edge_count(), 0);
+        assert!(g.outgoing_edges(&id1).is_empty());
+        assert!(g.incoming_edges(&id2).is_empty());
+    }
+
+    #[test]
+    fn remove_region_frees_children() {
+        let mut g = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_literal_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+
+        let r = Region::new(RegionKind::Parallel, vec![id1, id2]);
+        let rid = r.id;
+        g.add_region(r).unwrap();
+
+        g.remove_region(rid).unwrap();
+
+        assert_eq!(g.region_count(), 0);
+        assert_eq!(g.containing_region(&id1), None);
+        assert_eq!(g.containing_region(&id2), None);
+    }
+
+    #[test]
+    fn remove_region_updates_child_regions() {
+        let mut g = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_literal_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+
+        let parent = Region::new(RegionKind::Parallel, vec![id1]);
+        let parent_id = parent.id;
+        g.add_region(parent).unwrap();
+
+        let child = Region::new(RegionKind::Sequential, vec![id2]);
+        let child_id = child.id;
+        g.add_region(child).unwrap();
+        g.set_region_parent(child_id, parent_id).unwrap();
+
+        g.remove_region(parent_id).unwrap();
+
+        // Child region should lose its parent
+        assert_eq!(g.parent_region(&child_id), None);
+        let child_region = g.get_region(&child_id).unwrap();
+        assert_eq!(child_region.parent, None);
+        // n1 should be regionless now
+        assert_eq!(g.containing_region(&id1), None);
+    }
+
+    #[test]
+    fn inline_region_with_parent() {
+        let mut g = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_literal_node();
+        let n3 = make_literal_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        let id3 = n3.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_node(n3).unwrap();
+
+        // Outer region with n3
+        let outer = Region::new(RegionKind::Parallel, vec![id3]);
+        let outer_id = outer.id;
+        g.add_region(outer).unwrap();
+
+        // Inner region with n1, n2
+        let inner = Region::new(RegionKind::Sequential, vec![id1, id2]);
+        let inner_id = inner.id;
+        g.add_region(inner).unwrap();
+        g.set_region_parent(inner_id, outer_id).unwrap();
+
+        // Sub-region inside inner
+        let sub = Region::new(RegionKind::Atomic, vec![]);
+        let sub_id = sub.id;
+        g.add_region(sub).unwrap();
+        g.set_region_parent(sub_id, inner_id).unwrap();
+
+        g.inline_region(inner_id).unwrap();
+
+        // Inner region is gone
+        assert!(g.get_region(&inner_id).is_none());
+        // Children promoted to outer
+        assert_eq!(g.containing_region(&id1), Some(&outer_id));
+        assert_eq!(g.containing_region(&id2), Some(&outer_id));
+        // Sub-region reparented to outer
+        assert_eq!(g.parent_region(&sub_id), Some(&outer_id));
+        let sub_region = g.get_region(&sub_id).unwrap();
+        assert_eq!(sub_region.parent, Some(outer_id));
+    }
+
+    #[test]
+    fn inline_region_without_parent() {
+        let mut g = Graph::new();
+        let n1 = make_literal_node();
+        let id1 = n1.id;
+        g.add_node(n1).unwrap();
+
+        let r = Region::new(RegionKind::Parallel, vec![id1]);
+        let rid = r.id;
+        g.add_region(r).unwrap();
+
+        g.inline_region(rid).unwrap();
+
+        assert!(g.get_region(&rid).is_none());
+        assert_eq!(g.containing_region(&id1), None);
+    }
+
+    #[test]
+    fn extract_module_identifies_boundaries() {
+        let mut g = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_arithmetic_node();
+        let n3 = make_literal_node();
+        let n4 = make_literal_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        let id3 = n3.id;
+        let id4 = n4.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_node(n3).unwrap();
+        g.add_node(n4).unwrap();
+
+        // n1 -> n2 -> n3, n4 -> n2
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+        g.add_edge(Edge::new((id2, 0), (id3, 0))).unwrap();
+        g.add_edge(Edge::new((id4, 0), (id2, 1))).unwrap();
+
+        // Extract module = {n2}
+        let module_nodes: HashSet<NodeId> = [id2].into_iter().collect();
+        let module = g.extract_module(&module_nodes);
+
+        assert_eq!(module.graph.node_count(), 1);
+        // Inputs: n1->n2, n4->n2 (2 incoming boundary edges)
+        assert_eq!(module.inputs.len(), 2);
+        // Outputs: n2->n3 (1 outgoing boundary edge)
+        assert_eq!(module.outputs.len(), 1);
+        assert_eq!(module.outputs[0].internal_node, id2);
+        assert_eq!(module.outputs[0].external_node, id3);
+    }
+
+    #[test]
+    fn extract_module_captures_edge_types() {
+        use crate::types::Type;
+
+        let mut g = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_arithmetic_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+
+        g.add_edge(Edge::typed((id1, 0), (id2, 0), Type::f32()))
+            .unwrap();
+
+        let module_nodes: HashSet<NodeId> = [id2].into_iter().collect();
+        let module = g.extract_module(&module_nodes);
+
+        assert_eq!(module.inputs.len(), 1);
+        assert_eq!(module.inputs[0].data_type, Some(Type::f32()));
+    }
+
+    #[test]
+    fn replace_subgraph_basic() {
+        let mut g = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_arithmetic_node();
+        let n3 = make_literal_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        let id3 = n3.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_node(n3).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+        g.add_edge(Edge::new((id2, 0), (id3, 0))).unwrap();
+
+        // Replacement: a single new node
+        let mut replacement = Graph::new();
+        let new_node = make_literal_node();
+        let new_id = new_node.id;
+        replacement.add_node(new_node).unwrap();
+
+        let old_nodes: HashSet<NodeId> = [id2].into_iter().collect();
+        let mut port_map = HashMap::new();
+        port_map.insert((id2, 0), (new_id, 0)); // output boundary
+        // Also need to map the input boundary: (id2, 0) as target
+        // But the input edge is (id1,0)->(id2,0), so internal endpoint is (id2,0)
+        // Both boundary edges reference (id2, 0) — one as source, one as target
+        // port_map already has (id2, 0) -> (new_id, 0)
+
+        g.replace_subgraph(&old_nodes, &replacement, &port_map)
+            .unwrap();
+
+        assert!(g.get_node(&id2).is_none());
+        assert!(g.get_node(&new_id).is_some());
+        assert_eq!(g.node_count(), 3); // n1, new_node, n3
+        assert_eq!(g.edge_count(), 2); // reconnected boundary edges
+    }
+
+    #[test]
+    fn replace_subgraph_preserves_edge_metadata() {
+        use crate::graph::constraints::Lifetime;
+        use crate::types::Type;
+
+        let mut g = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_arithmetic_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        let mut edge = Edge::typed((id1, 0), (id2, 0), Type::i32());
+        edge.lifetime = Lifetime::Manual;
+        g.add_edge(edge).unwrap();
+
+        let mut replacement = Graph::new();
+        let new_node = make_literal_node();
+        let new_id = new_node.id;
+        replacement.add_node(new_node).unwrap();
+
+        let old_nodes: HashSet<NodeId> = [id2].into_iter().collect();
+        let mut port_map = HashMap::new();
+        port_map.insert((id2, 0), (new_id, 0));
+
+        g.replace_subgraph(&old_nodes, &replacement, &port_map)
+            .unwrap();
+
+        let new_edge = g.edges().next().unwrap();
+        assert_eq!(new_edge.data_type, Some(Type::i32()));
+        assert_eq!(new_edge.lifetime, Lifetime::Manual);
+    }
+
+    #[test]
+    fn replace_subgraph_unmapped_port_error() {
+        let mut g = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_arithmetic_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+
+        let replacement = Graph::new();
+        let old_nodes: HashSet<NodeId> = [id2].into_iter().collect();
+        let port_map = HashMap::new(); // Empty — missing mapping
+
+        let result = g.replace_subgraph(&old_nodes, &replacement, &port_map);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, GraphError::UnmappedBoundaryPort { .. }));
+    }
+
+    #[test]
+    fn replace_subgraph_invalid_target_in_port_map() {
+        let mut g = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_arithmetic_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+
+        let replacement = Graph::new(); // Empty — no nodes
+        let old_nodes: HashSet<NodeId> = [id2].into_iter().collect();
+        let fake_id = NodeId::new_v4();
+        let mut port_map = HashMap::new();
+        port_map.insert((id2, 0), (fake_id, 0)); // Maps to non-existent node
+
+        let result = g.replace_subgraph(&old_nodes, &replacement, &port_map);
+        assert!(result.is_err());
+        // Error should be caught before any mutation occurs
+        assert_eq!(g.node_count(), 2); // Graph unchanged
+    }
+
+    #[test]
+    fn compose_disjoint_with_connections() {
+        let mut g1 = Graph::new();
+        let n1 = make_literal_node();
+        let id1 = n1.id;
+        g1.add_node(n1).unwrap();
+
+        let mut g2 = Graph::new();
+        let n2 = make_arithmetic_node();
+        let id2 = n2.id;
+        g2.add_node(n2).unwrap();
+
+        g1.compose(&g2, &[((id1, 0), (id2, 0))]).unwrap();
+
+        assert_eq!(g1.node_count(), 2);
+        assert_eq!(g1.edge_count(), 1);
+        assert_eq!(g1.outgoing_edges(&id1).len(), 1);
+        assert_eq!(g1.incoming_edges(&id2).len(), 1);
+    }
+
+    #[test]
+    fn compose_validates_connections() {
+        let mut g1 = Graph::new();
+        let n1 = make_literal_node();
+        let id1 = n1.id;
+        g1.add_node(n1).unwrap();
+
+        let g2 = Graph::new();
+        let fake_id = NodeId::new_v4();
+
+        let result = g1.compose(&g2, &[((id1, 0), (fake_id, 0))]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn inline_region_preserves_edges() {
+        let mut g = Graph::new();
+        let n1 = make_literal_node();
+        let n2 = make_arithmetic_node();
+        let id1 = n1.id;
+        let id2 = n2.id;
+        g.add_node(n1).unwrap();
+        g.add_node(n2).unwrap();
+        g.add_edge(Edge::new((id1, 0), (id2, 0))).unwrap();
+
+        let r = Region::new(RegionKind::Sequential, vec![id1, id2]);
+        let rid = r.id;
+        g.add_region(r).unwrap();
+
+        g.inline_region(rid).unwrap();
+
+        assert_eq!(g.edge_count(), 1);
+        assert_eq!(g.outgoing_edges(&id1).len(), 1);
+        assert_eq!(g.incoming_edges(&id2).len(), 1);
     }
 }
