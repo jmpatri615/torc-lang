@@ -98,6 +98,30 @@ enum Commands {
         #[arg(long)]
         proofs: bool,
     },
+    /// FFI bridge generation
+    Ffi {
+        #[command(subcommand)]
+        action: FfiAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum FfiAction {
+    /// Generate FFI bridge graphs or C headers
+    Bridge {
+        /// Generate Torc bridge from a C FFI declaration (.ffi.toml)
+        #[arg(long)]
+        from_c: Option<String>,
+        /// Generate C header from Torc graph exports
+        #[arg(long)]
+        to_c: bool,
+        /// Input .trc file (for --to-c, default: graph/main.trc)
+        #[arg(long)]
+        input: Option<String>,
+        /// Output file path (for --to-c)
+        #[arg(long)]
+        output: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -216,6 +240,35 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             let project_dir = project_dir.unwrap_or(cwd);
             commands::clean::run(&project_dir, proofs)
         }
+
+        Commands::Ffi { action } => match action {
+            FfiAction::Bridge {
+                from_c,
+                to_c,
+                input,
+                output,
+            } => {
+                let (manifest, project_dir) = load_manifest_optional(&cwd)?;
+                let project_dir = project_dir.unwrap_or(cwd);
+                if let Some(ffi_toml) = from_c {
+                    commands::ffi::bridge_from_c(
+                        &project_dir,
+                        manifest.as_ref(),
+                        &ffi_toml,
+                    )
+                } else if to_c {
+                    commands::ffi::bridge_to_c(
+                        &project_dir,
+                        input.as_deref(),
+                        output.as_deref(),
+                    )
+                } else {
+                    anyhow::bail!(
+                        "specify --from-c <file.ffi.toml> or --to-c"
+                    )
+                }
+            }
+        },
     }
 }
 
@@ -318,5 +371,160 @@ mod integration_tests {
             false,
         )
         .unwrap();
+    }
+
+    /// FFI bridge-from-c workflow: .ffi.toml → bridge graph → .trc file.
+    #[test]
+    fn ffi_bridge_from_c_workflow() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("ffi-test");
+        commands::init::create_project(&project_path, "ffi-test").unwrap();
+
+        // Write a .ffi.toml declaration
+        let ffi_toml = r#"
+[foreign-library]
+name = "libm"
+abi = "C"
+header = "math.h"
+link = "-lm"
+
+[[functions]]
+name = "sin"
+c_signature = "double sin(double x)"
+trust_level = "platform"
+
+[[functions]]
+name = "cos"
+c_signature = "double cos(double x)"
+trust_level = "platform"
+"#;
+        std::fs::write(project_path.join("libm.ffi.toml"), ffi_toml).unwrap();
+
+        // Run bridge-from-c
+        commands::ffi::bridge_from_c(&project_path, None, "libm.ffi.toml").unwrap();
+
+        // Verify output exists
+        let output = project_path.join("graph/ffi/libm.trc");
+        assert!(output.is_file(), "bridge .trc file should exist");
+
+        // Verify round-trip: load the generated .trc and validate
+        let data = std::fs::read(&output).unwrap();
+        let trc = torc_trc::TrcFile::from_bytes(&data).unwrap();
+        assert!(trc.graph.node_count() > 0);
+    }
+
+    /// FFI bridge-to-c workflow: graph with exports → C header.
+    #[test]
+    fn ffi_bridge_to_c_workflow() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("export-test");
+        commands::init::create_project(&project_path, "export-test").unwrap();
+
+        // Create a graph with export annotations and save as .trc
+        use torc_core::builder::GraphBuilder;
+        use torc_core::graph::node::{ArithmeticOp, NodeKind};
+        use torc_core::types::{Type, TypeSignature};
+
+        let mut builder = GraphBuilder::new();
+        let id = builder.add_typed_node(
+            NodeKind::Arithmetic(ArithmeticOp::Add),
+            "add",
+            TypeSignature::pure_fn(vec![Type::i32(), Type::i32()], Type::i32()),
+        );
+        builder.annotate(id, "export.name", "torc_add").unwrap();
+        builder.annotate(id, "export.param.0", "a").unwrap();
+        builder.annotate(id, "export.param.1", "b").unwrap();
+        let graph = builder.into_graph();
+
+        let trc = torc_trc::TrcFile::new(graph);
+        let data = trc.to_bytes().unwrap();
+        std::fs::write(project_path.join("graph/main.trc"), &data).unwrap();
+
+        // Run bridge-to-c
+        commands::ffi::bridge_to_c(
+            &project_path,
+            None,
+            Some("include/exports.h"),
+        )
+        .unwrap();
+
+        let header_path = project_path.join("include/exports.h");
+        assert!(header_path.is_file(), "C header should exist");
+
+        let header = std::fs::read_to_string(&header_path).unwrap();
+        assert!(header.contains("torc_add"));
+        assert!(header.contains("int32_t"));
+    }
+
+    /// FFI trust policy enforcement from manifest.
+    #[test]
+    fn ffi_policy_enforcement() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("policy-test");
+        commands::init::create_project(&project_path, "policy-test").unwrap();
+
+        // Override torc.toml with trust policy that disallows unsafe
+        let manifest_toml = r#"
+[project]
+name = "policy-test"
+
+[ffi]
+c_headers = []
+
+[ffi.trust-policy]
+allow_unsafe = false
+"#;
+        std::fs::write(project_path.join("torc.toml"), manifest_toml).unwrap();
+
+        // Write an unsafe FFI declaration
+        let ffi_toml = r#"
+[foreign-library]
+name = "dangerlib"
+
+[[functions]]
+name = "dangerous"
+c_signature = "void dangerous(void)"
+trust_level = "unsafe"
+"#;
+        std::fs::write(project_path.join("danger.ffi.toml"), ffi_toml).unwrap();
+
+        let (manifest, _) =
+            TorcManifest::find_and_load(&project_path).unwrap().unwrap();
+
+        // Should fail due to policy
+        let result = commands::ffi::bridge_from_c(
+            &project_path,
+            Some(&manifest),
+            "danger.ffi.toml",
+        );
+        assert!(result.is_err(), "unsafe should be rejected by policy");
+    }
+
+    /// FFI manifest with trust policy and declarations fields.
+    #[test]
+    fn ffi_manifest_extended_fields() {
+        let toml_str = r#"
+[project]
+name = "ffi-project"
+
+[ffi]
+c_headers = ["include/bridge.h"]
+abi = "C"
+declarations = ["libm.ffi.toml", "libc.ffi.toml"]
+exports = ["torc_main", "torc_init"]
+
+[ffi.trust-policy]
+allow_unsafe = false
+require_audited = true
+platform_trusted = ["libm", "libc"]
+"#;
+        let manifest = TorcManifest::from_str(toml_str).unwrap();
+        let ffi = manifest.ffi.unwrap();
+        assert_eq!(ffi.declarations.len(), 2);
+        assert_eq!(ffi.exports.len(), 2);
+        let tp = ffi.trust_policy.unwrap();
+        assert_eq!(tp.allow_unsafe, Some(false));
+        assert_eq!(tp.require_audited, Some(true));
+        assert_eq!(tp.platform_trusted.len(), 2);
     }
 }

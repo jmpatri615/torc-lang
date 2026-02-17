@@ -104,7 +104,7 @@ pub struct VerificationConfig {
     pub timeout: Option<u64>,
 }
 
-/// FFI configuration section (parsed but unused until Phase 11).
+/// FFI configuration section.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FfiConfig {
     /// C header files to generate/consume.
@@ -113,6 +113,29 @@ pub struct FfiConfig {
     /// ABI specification.
     #[serde(default)]
     pub abi: Option<String>,
+    /// FFI declaration files (`.ffi.toml`).
+    #[serde(default)]
+    pub declarations: Vec<String>,
+    /// Exported function names (for C header generation).
+    #[serde(default)]
+    pub exports: Vec<String>,
+    /// Trust policy configuration.
+    #[serde(default, rename = "trust-policy")]
+    pub trust_policy: Option<FfiTrustPolicy>,
+}
+
+/// Trust policy configuration in torc.toml.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FfiTrustPolicy {
+    /// Whether unsafe trust level is allowed.
+    #[serde(default)]
+    pub allow_unsafe: Option<bool>,
+    /// Whether all functions must be at least audited.
+    #[serde(default)]
+    pub require_audited: Option<bool>,
+    /// Library names trusted at platform level.
+    #[serde(default)]
+    pub platform_trusted: Vec<String>,
 }
 
 /// Registry configuration section (parsed but unused until Phase 12).

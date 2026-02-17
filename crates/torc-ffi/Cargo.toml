@@ -7,4 +7,8 @@ license.workspace = true
 
 [dependencies]
 torc-core = { workspace = true }
+torc-targets = { workspace = true }
 thiserror = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+uuid = { workspace = true }
