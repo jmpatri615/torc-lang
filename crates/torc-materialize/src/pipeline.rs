@@ -24,6 +24,9 @@ pub struct PipelineConfig {
     pub transforms: TransformRegistry,
     /// Whether to enforce resource constraints (halt on overflow).
     pub enforce_resource_fit: bool,
+    /// Code generation configuration. None = skip codegen (Pass 1 behavior).
+    #[cfg(feature = "llvm")]
+    pub codegen: Option<crate::codegen::CodegenConfig>,
 }
 
 /// Output of a successful materialization pipeline run.
@@ -32,6 +35,9 @@ pub struct PipelineOutput {
     pub graph: Graph,
     /// Pipeline report with statistics.
     pub report: MaterializationReport,
+    /// Codegen artifact (if code generation was enabled).
+    #[cfg(feature = "llvm")]
+    pub artifact: Option<crate::codegen::CodegenOutput>,
 }
 
 /// Run the full materialization pipeline:
@@ -65,6 +71,43 @@ pub fn materialize(
         require_fit(&resource_report)?;
     }
 
+    // Stage 5: Code Emission (requires "llvm" feature)
+    #[cfg(feature = "llvm")]
+    let (artifact, codegen_enabled, code_size_bytes, optimization_profile, post_verify_passed) = {
+        if let Some(ref codegen_config) = config.codegen {
+            let output = crate::codegen::emit_code(
+                &graph,
+                &schedule,
+                &layout,
+                &config.platform,
+                codegen_config,
+            )?;
+
+            // Stage 6: Post-Materialization Verification
+            let pv_passed = if let Some(ref exe_path) = output.executable_path {
+                let pv =
+                    crate::postverify::verify_binary(exe_path, layout.estimated_code_bytes)?;
+                Some(pv.passed)
+            } else if let Some(ref obj_path) = output.object_path {
+                let pv =
+                    crate::postverify::verify_binary(obj_path, layout.estimated_code_bytes)?;
+                Some(pv.passed)
+            } else {
+                None
+            };
+
+            let size = output.code_size_bytes;
+            let profile = format!("{:?}", codegen_config.optimization);
+            (Some(output), true, Some(size), Some(profile), pv_passed)
+        } else {
+            (None, false, None, None, None)
+        }
+    };
+
+    #[cfg(not(feature = "llvm"))]
+    let (codegen_enabled, code_size_bytes, optimization_profile, post_verify_passed) =
+        (false, None, None, None);
+
     let duration_ms = start.elapsed().as_millis() as u64;
 
     let report = MaterializationReport {
@@ -76,9 +119,18 @@ pub fn materialize(
         schedule_depth: schedule.sequential_depth,
         max_parallelism: schedule.max_parallelism,
         resources: Some(resource_report),
+        codegen_enabled,
+        code_size_bytes,
+        optimization_profile,
+        post_verify_passed,
     };
 
-    Ok(PipelineOutput { graph, report })
+    Ok(PipelineOutput {
+        graph,
+        report,
+        #[cfg(feature = "llvm")]
+        artifact,
+    })
 }
 
 #[cfg(test)]
@@ -109,6 +161,8 @@ mod tests {
             gate: GateConfig::development(),
             transforms: TransformRegistry::new(),
             enforce_resource_fit: true,
+            #[cfg(feature = "llvm")]
+            codegen: None,
         };
 
         let output = materialize(g, config).unwrap();
@@ -130,6 +184,8 @@ mod tests {
             gate: GateConfig::development(),
             transforms,
             enforce_resource_fit: false,
+            #[cfg(feature = "llvm")]
+            codegen: None,
         };
 
         let output = materialize(g, config).unwrap();
@@ -144,6 +200,8 @@ mod tests {
             gate: GateConfig::development(),
             transforms: TransformRegistry::new(),
             enforce_resource_fit: true,
+            #[cfg(feature = "llvm")]
+            codegen: None,
         };
 
         let output = materialize(g, config).unwrap();

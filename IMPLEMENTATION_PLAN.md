@@ -2,7 +2,7 @@
 
 **Version:** 0.1.0
 **Last Updated:** 2026-02-16
-**Status:** Phase 7 Pass 1 — Complete
+**Status:** Phase 7 Pass 2 — Complete
 
 ---
 
@@ -25,7 +25,7 @@ The reference implementation is written in **Rust**, chosen for its memory safet
 | 4 | TRC Binary Format | Serialization/deserialization of .trc files | **Complete** |
 | 5 | Graph Construction API | Programmatic API for building graphs | **Complete** |
 | 6 | Verification Framework | SMT integration, structural analysis, proof caching | **Complete** |
-| 7 | Materialization Engine | Graph-to-executable pipeline via LLVM | **Pass 1 Complete** |
+| 7 | Materialization Engine | Graph-to-executable pipeline via LLVM | **Pass 2 Complete** |
 | 8 | Target Platform Models | ISA, microarchitecture, environment model parsing | **Pass 1 Complete** |
 | 9 | CLI Tool (`torc`) | Unified command-line interface | Not Started |
 | 10 | Observability Layer | Projection views, pseudo-code generation | Not Started |
@@ -392,23 +392,34 @@ torc/
 - [ ] WCET analysis integration (basic, for known targets)
 - [ ] Backtracking on resource constraint violation
 
-#### Phase 7e: LLVM Code Emission (Pass 2 — Not Started)
-- [ ] Integrate LLVM via `inkwell` (Rust LLVM bindings) or `llvm-sys`
-- [ ] Torc Target IR -> LLVM IR translation
-- [ ] LLVM optimization pass configuration per profile
-- [ ] ELF emission for Linux x86_64 (initial target)
-- [ ] ELF emission for Linux ARM64
-- [ ] Bare-metal ELF for ARM Cortex-M
+#### Phase 7e: LLVM Code Emission (Pass 2 — Complete)
+- [x] Integrate LLVM via `inkwell` (Rust LLVM bindings), feature-gated (`--features llvm`)
+- [x] Torc Type → LLVM type mapping (primitives, composites, wrappers peel to base)
+- [x] Node lowering: Literal, Arithmetic, Bitwise, Comparison, Select, Conversion
+- [x] LLVM optimization pass configuration per profile (Debug/Balanced/Throughput/MinimalSize/DeterministicTiming)
+- [x] Object file emission for Linux x86_64 via TargetMachine
+- [x] Executable linking via system `cc`
+- [x] LLVM IR and bitcode emission modes
+- [ ] ELF emission for Linux ARM64 (Pass 3+)
+- [ ] Bare-metal ELF for ARM Cortex-M (Pass 3+)
 
-#### Phase 7f: Post-Materialization Verification (Pass 2 — Not Started)
-- [ ] Binary size verification against predictions
-- [ ] Symbol table validation
-- [ ] Smoke test generation from contracts (stretch)
+#### Phase 7f: Post-Materialization Verification (Pass 2 — Complete)
+- [x] Binary size verification against predictions (5x tolerance)
+- [ ] Symbol table validation (Pass 3+)
+- [ ] Smoke test generation from contracts (stretch, Pass 3+)
 
 #### Pass 1 Summary
 - `torc-materialize`: 9 modules (error, canonicalize, gate, transform, schedule, layout, resource, report, pipeline)
 - `materialize()` orchestrator: canonicalize → verify gate → transform → schedule + layout + resource fit → report
 - 30 tests, 0 clippy warnings
+
+#### Pass 2 Summary
+- `codegen/` submodule: 6 files (mod, context, types, lower, emit, profile)
+- `postverify` module for binary size verification
+- Pipeline extended: emit_code → post-verify stages (feature-gated behind `llvm`)
+- MaterializationReport extended with codegen fields
+- 32 new tests (28 codegen + 4 postverify), 62 total in torc-materialize, 258 across workspace with llvm
+- 0 clippy warnings on both `--workspace` and `--features llvm`
 
 ### Key Dependencies
 

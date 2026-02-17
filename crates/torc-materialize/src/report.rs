@@ -25,6 +25,14 @@ pub struct MaterializationReport {
     pub max_parallelism: usize,
     /// Resource fitting report.
     pub resources: Option<ResourceReport>,
+    /// Whether code generation was enabled.
+    pub codegen_enabled: bool,
+    /// Code size in bytes (if codegen was run).
+    pub code_size_bytes: Option<u64>,
+    /// Optimization profile used (if codegen was run).
+    pub optimization_profile: Option<String>,
+    /// Whether post-materialization verification passed.
+    pub post_verify_passed: Option<bool>,
 }
 
 impl fmt::Display for MaterializationReport {
@@ -81,6 +89,24 @@ impl fmt::Display for MaterializationReport {
             write!(f, "{resources}")?;
         }
 
+        if self.codegen_enabled {
+            writeln!(f)?;
+            writeln!(f, "--- Code Generation ---")?;
+            if let Some(profile) = &self.optimization_profile {
+                writeln!(f, "  Optimization: {profile}")?;
+            }
+            if let Some(size) = self.code_size_bytes {
+                writeln!(f, "  Code size: {size} bytes")?;
+            }
+            if let Some(passed) = self.post_verify_passed {
+                writeln!(
+                    f,
+                    "  Post-verify: {}",
+                    if passed { "PASSED" } else { "FAILED" }
+                )?;
+            }
+        }
+
         Ok(())
     }
 }
@@ -111,6 +137,10 @@ mod tests {
             schedule_depth: 5,
             max_parallelism: 3,
             resources: None,
+            codegen_enabled: false,
+            code_size_bytes: None,
+            optimization_profile: None,
+            post_verify_passed: None,
         };
 
         let output = format!("{report}");

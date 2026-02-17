@@ -26,4 +26,16 @@ pub enum MaterializationError {
 
     #[error("missing required config field: {field}")]
     MissingConfig { field: String },
+
+    #[error("code generation failed at {stage}: {message}")]
+    CodegenFailed { stage: String, message: String },
+
+    #[error("LLVM target initialization failed for {target}")]
+    TargetInitFailed { target: String },
+
+    #[error("linking failed: {message}")]
+    LinkFailed { message: String },
+
+    #[error("post-materialization verification failed: {reason}")]
+    PostVerifyFailed { reason: String },
 }
