@@ -65,7 +65,7 @@ pub fn run(
 
     // Resolve optional platform
     let platform = if let Some(target_name) = target {
-        Some(resolve_target(target_name).ok_or_else(|| {
+        Some(resolve_target(target_name, Some(project_dir)).ok_or_else(|| {
             anyhow::anyhow!(
                 "unknown target: '{target_name}'. Use 'torc target list' to see available targets."
             )

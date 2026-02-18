@@ -7,11 +7,13 @@ use serde::{Deserialize, Serialize};
 
 /// The type of execution environment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum EnvironmentType {
     /// No operating system; direct hardware access.
     BareMetal,
     Linux,
     Windows,
+    #[serde(rename = "macos")]
     MacOS,
     /// WebAssembly System Interface.
     Wasi,
@@ -19,6 +21,7 @@ pub enum EnvironmentType {
 
 /// A named region of the target's memory map.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MemoryRegion {
     /// Region name (e.g., "FLASH", "SRAM", "CCMRAM").
     pub name: String,
@@ -36,10 +39,12 @@ pub struct MemoryRegion {
 
 /// Binary output format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum BinaryFormat {
     Elf32,
     Elf64,
     Pe,
+    #[serde(rename = "macho")]
     MachO,
     Wasm,
     RawBinary,
@@ -47,6 +52,7 @@ pub enum BinaryFormat {
 
 /// Model of the target execution environment.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct EnvironmentModel {
     /// Environment name (e.g., "linux-x86_64", "stm32f407-bare").
     pub name: String,
@@ -114,7 +120,7 @@ impl EnvironmentModel {
                 },
                 MemoryRegion {
                     name: "heap".into(),
-                    base_address: 0x0060_0000,
+                    base_address: 0x4000_0000, // 1 GiB (above text)
                     size_bytes: 4 * 1024 * 1024 * 1024, // 4 GiB
                     readable: true,
                     writable: true,

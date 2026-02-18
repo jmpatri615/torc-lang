@@ -238,12 +238,37 @@ profile = "development"
 }
 
 /// Resolve a target platform name to a `Platform`.
-pub fn resolve_target(name: &str) -> Option<torc_targets::Platform> {
+///
+/// Resolution order:
+/// 1. Built-in platforms (linux-x86_64, stm32f407-discovery)
+/// 2. Custom `.target.toml` file in `{project_dir}/targets/{name}.target.toml`
+///
+/// Parse errors for custom targets are printed to stderr but still return `None`.
+pub fn resolve_target(name: &str, project_dir: Option<&Path>) -> Option<torc_targets::Platform> {
+    // 1. Built-in match
     match name {
-        "linux-x86_64" => Some(torc_targets::Platform::generic_linux_x86_64()),
-        "stm32f407-discovery" => Some(torc_targets::Platform::stm32f407_discovery()),
-        _ => None,
+        "linux-x86_64" => return Some(torc_targets::Platform::generic_linux_x86_64()),
+        "stm32f407-discovery" => return Some(torc_targets::Platform::stm32f407_discovery()),
+        _ => {}
     }
+
+    // 2. Custom .target.toml file
+    if let Some(dir) = project_dir {
+        let target_path = dir.join("targets").join(format!("{name}.target.toml"));
+        if target_path.exists() {
+            match torc_targets::load_platform_toml(&target_path) {
+                Ok(platform) => return Some(platform),
+                Err(e) => {
+                    eprintln!(
+                        "warning: failed to parse {}: {e}",
+                        target_path.display()
+                    );
+                }
+            }
+        }
+    }
+
+    None
 }
 
 /// List all built-in target platform names.
@@ -356,9 +381,9 @@ enforce_resources = true
 
     #[test]
     fn resolve_builtin_targets() {
-        assert!(resolve_target("linux-x86_64").is_some());
-        assert!(resolve_target("stm32f407-discovery").is_some());
-        assert!(resolve_target("nonexistent").is_none());
+        assert!(resolve_target("linux-x86_64", None).is_some());
+        assert!(resolve_target("stm32f407-discovery", None).is_some());
+        assert!(resolve_target("nonexistent", None).is_none());
     }
 
     #[test]

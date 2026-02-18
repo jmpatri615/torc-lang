@@ -454,30 +454,39 @@ torc/
 
 ### Tasks
 
-- [ ] Define TOML schema for ISA models
-- [ ] Define TOML schema for microarchitecture models
-- [ ] Define TOML schema for environment models
-- [ ] Implement model parsing and validation (from TOML files)
+- [x] Define TOML schema for ISA models
+- [x] Define TOML schema for microarchitecture models
+- [x] Define TOML schema for environment models
+- [x] Implement model parsing and validation (from TOML files)
 - [x] Implement model composition (ISA + uarch + env = platform)
 - [x] Create reference models:
   - [x] `linux-x86_64` (Platform::generic_linux_x86_64)
   - [ ] `linux-aarch64-gnu`
   - [x] `bare-metal-arm-cortex-m4f` (Platform::stm32f407_discovery)
-- [x] Implement `torc target describe` output
+- [x] Implement `torc target describe` output (+ `--format toml`)
 - [x] Implement resource constraint extraction from models (for Phase 7d)
+- [x] Implement `torc target add` — generate .target.toml template
+- [x] Implement `torc target validate` — structural validation
+- [x] Implement `torc target list` — show custom targets from targets/ dir
+- [x] Custom target resolution in `resolve_target()` (built-in → .target.toml)
+- [x] `--all-targets` discovers custom .target.toml files
 
 ### Summary
-- `torc-targets`: 4 modules (isa, microarch, environment, platform)
+- `torc-targets`: 6 modules (isa, microarch, environment, platform, error, parse)
 - 3-layer model: IsaModel + MicroarchModel + EnvironmentModel = Platform
 - Built-in constructors: x86_64, ARMv7-M, Cortex-M4, Linux, bare-metal ARM, STM32F407
+- TOML parsing: load_platform_toml, parse_platform_toml, platform_to_toml
+- Validation: 10 structural checks (word size, overlap, isa_ref match, etc.)
+- Discovery: discover_targets() finds targets/*.target.toml files
+- All structs/enums have `#[serde(rename_all = "kebab-case")]` for idiomatic TOML
 - ResourceConstraints derived from Platform for materialization
-- 9 tests, 0 clippy warnings
+- 27 tests in torc-targets, 0 clippy warnings
 
 ### Acceptance Criteria
 
-- Can parse and validate the STM32F407 example model from spec section 7
-- Platform models provide all data needed by the materialization engine
-- Custom target models can be authored and validated
+- [x] Can parse and validate the STM32F407 example model from spec section 7
+- [x] Platform models provide all data needed by the materialization engine
+- [x] Custom target models can be authored and validated
 
 ---
 
@@ -501,7 +510,7 @@ torc/
   - [x] `--module`, `--node`
 - [x] Implement `torc target` subcommands
   - [x] `list`, `describe`
-  - [ ] `add`, `validate` — stubs
+  - [x] `add`, `validate` (Phase 8 Pass 2)
 - [x] Implement `torc doctor` — toolchain diagnostics
 - [x] Implement `torc clean`
 - [x] Implement `torc.toml` project manifest parsing

@@ -65,7 +65,7 @@ pub fn run(project_dir: &Path, target: Option<&str>) -> Result<()> {
     if let Some(target_name) = target {
         println!();
         println!("--- Target: {target_name} ---");
-        match crate::manifest::resolve_target(target_name) {
+        match crate::manifest::resolve_target(target_name, Some(project_dir)) {
             Some(platform) => {
                 println!("  ISA:    {}", platform.isa.name);
                 println!("  Flash:  {} bytes", platform.flash_size_bytes);

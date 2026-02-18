@@ -219,13 +219,16 @@ enum TargetAction {
     Describe {
         /// Platform name
         name: String,
+        /// Output format (default: human-readable, "toml" for TOML)
+        #[arg(long)]
+        format: Option<String>,
     },
-    /// Add a custom target (not yet implemented)
+    /// Add a custom target definition
     Add {
         /// Platform name
         name: String,
     },
-    /// Validate a target definition (not yet implemented)
+    /// Validate a target definition
     Validate {
         /// Platform name
         name: String,
@@ -309,12 +312,20 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             )
         }
 
-        Commands::Target { action } => match action {
-            TargetAction::List => commands::target::list(),
-            TargetAction::Describe { name } => commands::target::describe(&name),
-            TargetAction::Add { name } => commands::target::add(&name),
-            TargetAction::Validate { name } => commands::target::validate(&name),
-        },
+        Commands::Target { action } => {
+            let (_, project_dir) = load_manifest_optional(&cwd)?;
+            let project_dir = project_dir.unwrap_or_else(|| cwd.clone());
+            match action {
+                TargetAction::List => commands::target::list(Some(&project_dir)),
+                TargetAction::Describe { name, format } => {
+                    commands::target::describe(&name, Some(&project_dir), format.as_deref())
+                }
+                TargetAction::Add { name } => commands::target::add(&name, &project_dir),
+                TargetAction::Validate { name } => {
+                    commands::target::validate(&name, Some(&project_dir))
+                }
+            }
+        }
 
         Commands::Doctor { target } => {
             let (_, project_dir) = load_manifest_optional(&cwd)?;

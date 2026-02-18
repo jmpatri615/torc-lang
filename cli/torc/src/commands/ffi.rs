@@ -38,7 +38,7 @@ pub fn bridge_from_c(
     // Resolve word size from manifest target platform (default 64-bit)
     let word_bits = manifest
         .and_then(|m| m.default_target())
-        .and_then(crate::manifest::resolve_target)
+        .and_then(|name| crate::manifest::resolve_target(name, Some(project_dir)))
         .map(|p| p.isa.word_size as u8)
         .unwrap_or(64);
 

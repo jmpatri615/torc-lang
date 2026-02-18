@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 /// Memory subsystem timing characteristics.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MemoryTiming {
     /// Width of the memory bus in bits.
     pub bus_width_bits: u32,
@@ -18,6 +19,7 @@ pub struct MemoryTiming {
 
 /// Pipeline model for timing estimation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct PipelineModel {
     /// Number of pipeline stages.
     pub stages: u32,
@@ -29,6 +31,7 @@ pub struct PipelineModel {
 
 /// Microarchitecture model for a specific processor implementation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MicroarchModel {
     /// Microarchitecture name (e.g., "Cortex-M4", "Skylake").
     pub name: String,

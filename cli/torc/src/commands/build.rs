@@ -30,7 +30,7 @@ pub fn run(
     check_resources: bool,
 ) -> Result<()> {
     // Resolve targets
-    let platforms = resolve_platforms(target, all_targets, manifest)?;
+    let platforms = resolve_platforms(target, all_targets, manifest, project_dir)?;
 
     // Decision readiness check + gate profile adjustment
     let decision_graph = load_tdg_optional(project_dir);
@@ -165,10 +165,11 @@ fn resolve_platforms(
     target: Option<&str>,
     all_targets: bool,
     manifest: Option<&TorcManifest>,
+    project_dir: &Path,
 ) -> Result<Vec<Platform>> {
     // --target flag takes precedence (single target)
     if let Some(name) = target {
-        let platform = resolve_target(name).ok_or_else(|| {
+        let platform = resolve_target(name, Some(project_dir)).ok_or_else(|| {
             anyhow::anyhow!(
                 "unknown target: '{name}'. Use 'torc target list' to see available targets."
             )
@@ -176,22 +177,32 @@ fn resolve_platforms(
         return Ok(vec![platform]);
     }
 
-    // --all-targets: build for every platform in manifest.targets.platforms
+    // --all-targets: build for every platform in manifest.targets.platforms + discovered custom
     if all_targets {
         if let Some(manifest) = manifest {
             if let Some(ref targets) = manifest.targets {
                 let mut platforms = Vec::new();
                 // Include default target
                 if let Some(ref default_name) = targets.default {
-                    if let Some(p) = resolve_target(default_name) {
+                    if let Some(p) = resolve_target(default_name, Some(project_dir)) {
                         platforms.push(p);
                     }
                 }
                 // Include per-platform entries
                 for name in targets.platforms.keys() {
-                    if let Some(p) = resolve_target(name) {
+                    if let Some(p) = resolve_target(name, Some(project_dir)) {
                         if !platforms.iter().any(|existing| existing.name == p.name) {
                             platforms.push(p);
+                        }
+                    }
+                }
+                // Also discover custom .target.toml files
+                if let Ok(custom) = torc_targets::discover_targets(project_dir) {
+                    for (name, _path) in custom {
+                        if !platforms.iter().any(|existing| existing.name == name) {
+                            if let Some(p) = resolve_target(&name, Some(project_dir)) {
+                                platforms.push(p);
+                            }
                         }
                     }
                 }
@@ -207,7 +218,7 @@ fn resolve_platforms(
     // Manifest default
     if let Some(manifest) = manifest {
         if let Some(name) = manifest.default_target() {
-            if let Some(platform) = resolve_target(name) {
+            if let Some(platform) = resolve_target(name, Some(project_dir)) {
                 return Ok(vec![platform]);
             }
         }
@@ -339,13 +350,16 @@ mod tests {
 
     #[test]
     fn resolve_platforms_cli_flag() {
-        let platforms = resolve_platforms(Some("linux-x86_64"), false, None).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let platforms =
+            resolve_platforms(Some("linux-x86_64"), false, None, dir.path()).unwrap();
         assert_eq!(platforms.len(), 1);
         assert_eq!(platforms[0].name, "linux-x86_64");
     }
 
     #[test]
     fn resolve_platforms_manifest_default() {
+        let dir = tempfile::tempdir().unwrap();
         let manifest = TorcManifest::from_str(
             r#"
 [project]
@@ -355,25 +369,29 @@ default = "stm32f407-discovery"
 "#,
         )
         .unwrap();
-        let platforms = resolve_platforms(None, false, Some(&manifest)).unwrap();
+        let platforms =
+            resolve_platforms(None, false, Some(&manifest), dir.path()).unwrap();
         assert_eq!(platforms.len(), 1);
         assert_eq!(platforms[0].name, "stm32f407-discovery");
     }
 
     #[test]
     fn resolve_platforms_fallback() {
-        let platforms = resolve_platforms(None, false, None).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let platforms = resolve_platforms(None, false, None, dir.path()).unwrap();
         assert_eq!(platforms.len(), 1);
         assert_eq!(platforms[0].name, "linux-x86_64");
     }
 
     #[test]
     fn resolve_platforms_unknown() {
-        assert!(resolve_platforms(Some("nonexistent"), false, None).is_err());
+        let dir = tempfile::tempdir().unwrap();
+        assert!(resolve_platforms(Some("nonexistent"), false, None, dir.path()).is_err());
     }
 
     #[test]
     fn resolve_platforms_all_targets() {
+        let dir = tempfile::tempdir().unwrap();
         let manifest = TorcManifest::from_str(
             r#"
 [project]
@@ -385,7 +403,8 @@ optimization = "minimal-size"
 "#,
         )
         .unwrap();
-        let platforms = resolve_platforms(None, true, Some(&manifest)).unwrap();
+        let platforms =
+            resolve_platforms(None, true, Some(&manifest), dir.path()).unwrap();
         assert!(platforms.len() >= 2);
         assert!(platforms.iter().any(|p| p.name == "linux-x86_64"));
         assert!(platforms.iter().any(|p| p.name == "stm32f407-discovery"));
@@ -393,7 +412,8 @@ optimization = "minimal-size"
 
     #[test]
     fn resolve_platforms_all_targets_no_manifest() {
-        assert!(resolve_platforms(None, true, None).is_err());
+        let dir = tempfile::tempdir().unwrap();
+        assert!(resolve_platforms(None, true, None, dir.path()).is_err());
     }
 
     #[cfg(feature = "llvm")]

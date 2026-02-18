@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 /// Byte ordering of the target architecture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum Endianness {
     Little,
     Big,
@@ -16,6 +17,7 @@ pub enum Endianness {
 
 /// A class of registers (e.g., general-purpose, FP, vector).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct RegisterClass {
     /// Name of the register class (e.g., "gpr", "fpr", "simd").
     pub name: String,
@@ -27,6 +29,7 @@ pub struct RegisterClass {
 
 /// A calling convention specifying register usage and stack layout.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct CallingConvention {
     /// Convention name (e.g., "System V AMD64", "AAPCS").
     pub name: String,
@@ -42,6 +45,7 @@ pub struct CallingConvention {
 
 /// Model of an instruction set architecture.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct IsaModel {
     /// Architecture name (e.g., "x86_64", "ARMv7-M").
     pub name: String,

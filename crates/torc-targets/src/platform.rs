@@ -11,6 +11,7 @@ use crate::microarch::MicroarchModel;
 
 /// Resource constraints for a target platform.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct ResourceConstraints {
     /// Available flash/ROM in bytes.
     pub flash_bytes: u64,
@@ -24,6 +25,7 @@ pub struct ResourceConstraints {
 
 /// A complete platform model composing ISA, microarchitecture, and environment.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct Platform {
     /// Platform name (e.g., "linux-x86_64", "stm32f407-discovery").
     pub name: String,
