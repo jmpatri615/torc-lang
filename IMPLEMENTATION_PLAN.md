@@ -1,8 +1,8 @@
 # Torc Implementation Plan
 
 **Version:** 0.1.0
-**Last Updated:** 2026-02-16
-**Status:** Phase 7 Pass 2 — Complete
+**Last Updated:** 2026-02-17
+**Status:** Phase 14 — In Progress
 
 ---
 
@@ -25,13 +25,14 @@ The reference implementation is written in **Rust**, chosen for its memory safet
 | 4 | TRC Binary Format | Serialization/deserialization of .trc files | **Complete** |
 | 5 | Graph Construction API | Programmatic API for building graphs | **Complete** |
 | 6 | Verification Framework | SMT integration, structural analysis, proof caching | **Complete** |
-| 7 | Materialization Engine | Graph-to-executable pipeline via LLVM | **Pass 2 Complete** |
-| 8 | Target Platform Models | ISA, microarchitecture, environment model parsing | **Pass 1 Complete** |
-| 9 | CLI Tool (`torc`) | Unified command-line interface | Not Started |
-| 10 | Observability Layer | Projection views, pseudo-code generation | Not Started |
-| 11 | FFI Bridge | C interop (Rust interop stretch goal) | Not Started |
-| 12 | Registry Client | Package fetching and publishing | Not Started |
-| 13 | Integration & Examples | End-to-end example applications | Not Started |
+| 7 | Materialization Engine | Graph-to-executable pipeline via LLVM | **Complete** |
+| 8 | Target Platform Models | ISA, microarchitecture, environment model parsing | **Complete** |
+| 9 | CLI Tool (`torc`) | Unified command-line interface | **Complete** |
+| 10 | Observability Layer | Projection views, pseudo-code generation | **Complete** |
+| 11 | FFI Bridge | C interop (Rust interop stretch goal) | **Complete** |
+| 12 | Registry Client | Package fetching and publishing | **Complete** |
+| 13 | Integration & Examples | End-to-end example applications | **In Progress** |
+| 14 | Specification Interface | Decision state model, collaborative intent resolution | **In Progress** |
 
 ---
 
@@ -84,13 +85,19 @@ torc/
 │   ├── torc-observe/          # Observability layer
 │   │   ├── Cargo.toml
 │   │   └── src/
-│   └── torc-registry/         # Registry client
+│   ├── torc-registry/         # Registry client
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   └── torc-spec/             # Specification interface (Decision State Model)
 │       ├── Cargo.toml
 │       └── src/
 ├── cli/
 │   └── torc/                    # CLI binary
 │       ├── Cargo.toml
 │       └── src/
+├── examples/
+│   ├── foc-controller/         # FOC motor controller example
+│   └── checksum/               # Internet checksum example
 ├── spec/                       # Language specification
 └── tests/
     └── integration/            # Cross-crate integration tests
@@ -345,6 +352,12 @@ torc/
   - [x] `certification` (exhaustive, independent proof checking)
 - [x] Implement waiver management
 
+### Summary
+
+- `torc-verify`: 8 modules (engine, registry, structural, interval, witness, cache, report, profile)
+- VerificationEngine orchestrator: collect → cache → structural → interval → (SMT) → report
+- 24 tests, 0 clippy warnings
+
 ### Key Dependencies
 
 - Z3 or CVC5 must be available at build time (system dependency or vendored)
@@ -450,10 +463,10 @@ torc/
   - [x] `linux-x86_64` (Platform::generic_linux_x86_64)
   - [ ] `linux-aarch64-gnu`
   - [x] `bare-metal-arm-cortex-m4f` (Platform::stm32f407_discovery)
-- [ ] Implement `torc target describe` output
+- [x] Implement `torc target describe` output
 - [x] Implement resource constraint extraction from models (for Phase 7d)
 
-### Pass 1 Summary
+### Summary
 - `torc-targets`: 4 modules (isa, microarch, environment, platform)
 - 3-layer model: IsaModel + MicroarchModel + EnvironmentModel = Platform
 - Built-in constructors: x86_64, ARMv7-M, Cortex-M4, Linux, bare-metal ARM, STM32F407
@@ -474,31 +487,31 @@ torc/
 
 ### Tasks
 
-- [ ] Set up CLI framework (use `clap`)
-- [ ] Implement `torc init` — project scaffolding
-- [ ] Implement `torc build` — invoke materialization engine
-  - [ ] `--target`, `--all-targets`, `--release`, `--profile`
-  - [ ] `--emit=llvm-ir`, `--emit=asm`, `--emit=graph-stats`
-  - [ ] `--check-resources`
-- [ ] Implement `torc verify` — invoke verification framework
-  - [ ] `--module`, `--contract`, `--report`, `--status`
-  - [ ] `--incremental`
-- [ ] Implement `torc inspect` — launch observability views
-  - [ ] `--view dataflow|contracts|resources|pseudo-code|provenance|diff`
-  - [ ] `--module`, `--node`
-- [ ] Implement `torc target` subcommands
-  - [ ] `add`, `list`, `describe`, `validate`
-- [ ] Implement `torc doctor` — toolchain diagnostics
-- [ ] Implement `torc clean`
-- [ ] Implement `torc.toml` project manifest parsing
+- [x] Set up CLI framework (use `clap`)
+- [x] Implement `torc init` — project scaffolding
+- [x] Implement `torc build` — invoke materialization engine
+  - [x] `--target`, `--all-targets`, `--release`, `--profile`
+  - [x] `--emit=llvm-ir`, `--emit=asm`, `--emit=graph-stats`
+  - [x] `--check-resources`
+- [x] Implement `torc verify` — invoke verification framework
+  - [x] `--module`, `--contract`, `--report`, `--status`
+  - [x] `--incremental`
+- [x] Implement `torc inspect` — launch observability views
+  - [x] `--view dataflow|contracts|resources|pseudo-code|provenance|diff`
+  - [x] `--module`, `--node`
+- [x] Implement `torc target` subcommands
+  - [x] `list`, `describe`
+  - [ ] `add`, `validate` — stubs
+- [x] Implement `torc doctor` — toolchain diagnostics
+- [x] Implement `torc clean`
+- [x] Implement `torc.toml` project manifest parsing
 - [ ] Implement configuration hierarchy (defaults, system, project, CLI, env vars)
 
-### Deferred to Later
-
-- [ ] `torc add` / `torc remove` / `torc update` (needs registry — Phase 12)
-- [ ] `torc publish` / `torc login` (needs registry — Phase 12)
-- [ ] `torc ffi bridge` (needs FFI — Phase 11)
-- [ ] `torc toolchain` / `torc component` (needs distribution infrastructure)
+### Summary
+- clap 4 derive-based CLI with subcommands: init, build, verify, inspect, target, doctor, clean
+- manifest.rs: TorcManifest serde struct, find_and_load() walks up for torc.toml, template()
+- Feature forwarding: `llvm` → torc-materialize/llvm, `z3` → torc-verify/z3
+- 31 tests (integration tests covering init→verify→build→clean workflow)
 
 ### Acceptance Criteria
 
@@ -516,16 +529,23 @@ torc/
 
 ### Tasks
 
-- [ ] Implement projection view framework (view trait, rendering pipeline)
-- [ ] Implement **pseudo-code view**: generate procedural-style approximation from graph
-- [ ] Implement **contract view**: tabular contract summary
-- [ ] Implement **resource budget view**: ASCII bar charts of utilization
-- [ ] Implement **dataflow view**: text-based graph rendering (for terminal)
+- [x] Implement projection view framework (view trait, rendering pipeline)
+- [x] Implement **pseudo-code view**: generate procedural-style approximation from graph
+- [x] Implement **contract view**: tabular contract summary
+- [x] Implement **resource budget view**: ASCII bar charts of utilization
+- [x] Implement **dataflow view**: text-based graph rendering (for terminal)
   - [ ] Stretch: GraphViz DOT output for visual rendering
-- [ ] Implement **provenance view**: creation/edit history display
+- [x] Implement **provenance view**: creation/edit history display
 - [ ] Implement **diff view**: semantic graph diff between versions
-- [ ] Implement export formats: JSON, CSV
-- [ ] Implement `torc inspect` integration (wire views to CLI)
+- [x] Implement export formats: JSON
+  - [ ] CSV, SPDX, PDF exports
+- [x] Implement `torc inspect` integration (wire views to CLI)
+
+### Summary
+- `torc-observe`: 7 modules (view, format, pseudo_code, contract_table, resource_budget, dataflow, provenance)
+- View trait + ViewOutput (text+JSON dual) + RenderContext
+- PseudoCodeView, ContractView, ResourceBudgetView, DataflowView, ProvenanceView
+- 39 tests, 0 clippy warnings
 
 ### Acceptance Criteria
 
@@ -542,23 +562,30 @@ torc/
 
 ### Tasks
 
-- [ ] Implement FFI declaration parsing (`.ffi.toml` files)
-- [ ] Implement Torc-to-C bridge generation:
-  - [ ] Runtime precondition checks at boundary
-  - [ ] ABI adaptation (struct layout, calling convention)
-  - [ ] Postcondition validation on return
-  - [ ] Result wrapping (null -> Option::None, etc.)
-- [ ] Implement C-to-Torc bridge generation:
-  - [ ] C header generation from Torc graph interfaces
-  - [ ] Export symbol generation
-  - [ ] Contract documentation in header comments
-- [ ] Implement trust levels: `verified`, `platform`, `audited`, `unsafe`
-- [ ] Implement data marshaling:
-  - [ ] Primitive types (direct mapping)
-  - [ ] Structs (ABI-compatible layout)
-  - [ ] Strings (UTF-8 + null terminator)
-  - [ ] Arrays (pointer + length)
-- [ ] Implement `torc ffi bridge` CLI subcommand
+- [x] Implement FFI declaration parsing (`.ffi.toml` files)
+- [x] Implement Torc-to-C bridge generation:
+  - [x] Runtime precondition checks at boundary
+  - [x] ABI adaptation (struct layout, calling convention)
+  - [x] Postcondition validation on return
+  - [x] Result wrapping (null -> Option::None, etc.)
+- [x] Implement C-to-Torc bridge generation:
+  - [x] C header generation from Torc graph interfaces
+  - [x] Export symbol generation
+  - [x] Contract documentation in header comments
+- [x] Implement trust levels: `verified`, `platform`, `audited`, `unsafe`
+- [x] Implement data marshaling:
+  - [x] Primitive types (direct mapping)
+  - [x] Structs (ABI-compatible layout)
+  - [x] Strings (UTF-8 + null terminator)
+  - [x] Arrays (pointer + length)
+- [x] Implement `torc ffi bridge` CLI subcommand
+- [x] Implement trust policy enforcement
+
+### Summary
+- `torc-ffi`: 7 modules (trust, csig, declaration, marshal, bridge_from_c, bridge_to_c, policy)
+- CSignature parser: hand-written recursive-descent for C function signatures
+- FfiDeclaration: serde .ffi.toml parsing with ForeignLibrary + ForeignFunction
+- 44 tests, 0 clippy warnings
 
 ### Stretch Goal
 
@@ -579,19 +606,25 @@ torc/
 
 ### Tasks
 
-- [ ] Define registry API protocol (HTTP + content-addressed storage)
-- [ ] Implement module manifest parsing
-- [ ] Implement dependency resolution (semver with contract awareness)
-- [ ] Implement `torc add` / `torc remove` / `torc update`
-- [ ] Implement `torc tree` — dependency tree display
-- [ ] Implement `torc publish` — package publishing
-- [ ] Implement `torc audit` — dependency auditing
-- [ ] Implement local module cache
-- [ ] Implement content-addressed integrity verification
-- [ ] Implement registry authentication
+- [x] Implement module manifest parsing
+- [x] Implement dependency resolution (semver with contract awareness)
+- [x] Implement `torc add` / `torc remove` / `torc update`
+- [x] Implement `torc tree` — dependency tree display
+- [x] Implement `torc publish` — package publishing (local registry)
+- [x] Implement `torc audit` — dependency auditing
+- [x] Implement local module cache
+- [x] Implement content-addressed integrity verification
+
+### Summary
+- `torc-registry`: 10 modules (version, module_manifest, integrity, cache, client, resolution, publish, audit, tree, error)
+- Version: semver wrapper with parse_version, parse_requirement, resolve_best
+- LocalRegistry: filesystem backend for development/testing
+- Greedy semver resolver with transitive deps, conflict detection, lock entries
+- 52 tests, 0 clippy warnings
 
 ### Deferred
 
+- [ ] HTTP registry (needs API protocol + server)
 - [ ] Private registry hosting
 - [ ] Federated registry resolution
 - [ ] Proof library publishing and resolution
@@ -612,15 +645,13 @@ torc/
 
 ### Tasks
 
-- [ ] Implement the checksum example from spec section 3 (textual projection)
-- [ ] Implement the Clarke transform from spec section 12
-- [ ] Implement the safety monitor from spec section 12
-- [ ] Implement the PID controller module
-- [ ] Build the complete FOC motor controller example:
-  - [ ] Materialize for Linux x86_64 simulation target
-  - [ ] Materialize for STM32F407 bare-metal target (if Phase 7e embedded support complete)
+- [x] Implement the FOC motor controller example (74 nodes, 92 edges, 2 regions)
+- [x] Implement the checksum example from spec section 3
+- [ ] Implement the PID controller module (standalone)
+- [x] Integration tests for FOC and checksum examples (verify, observe, TRC round-trip)
+- [ ] Materialize for Linux x86_64 simulation target (requires LLVM)
+- [ ] Materialize for STM32F407 bare-metal target (requires Phase 7e embedded support)
 - [ ] Produce verification report matching spec section 12 output
-- [ ] Produce resource utilization report matching spec section 12 output
 - [ ] Document the end-to-end workflow
 
 ### Acceptance Criteria
@@ -629,6 +660,56 @@ torc/
 - Verification produces meaningful results (not just "all trivially pass")
 - Observability views produce output matching spec examples
 - The workflow from graph construction to executable is fully automated via `torc`
+
+---
+
+## Phase 14: Specification Interface
+
+**Goal:** Implement the Decision State Model from spec section 13 — collaborative system for resolving human design intent into engineering decisions.
+
+### Tasks
+
+- [x] Implement `torc-spec` crate with Decision State Model
+  - [x] DecisionState: 7 states (Unexplored, Deferred, Exploring, Tentative, Committed, Derived, Conflicted)
+  - [x] Decision struct with state machine, value, dependencies, revisit triggers
+  - [x] Assumption tracking with confidence and impact levels
+  - [x] DecisionGraph container with CRUD + state transitions + history
+  - [x] Impact analysis on commit (derived consequences, exclusions, concerns)
+  - [x] Conflict detection (circular dependencies, incompatible states)
+  - [x] TDG file format (.tdg) for serialization with SHA-256 integrity
+- [x] Implement CLI `torc decision` subcommands
+  - [x] `init` — create empty decisions.tdg
+  - [x] `list` — table of decisions with state/domain filters
+  - [x] `show` — full decision details + history
+  - [x] `commit` — commit a decision + show impact report
+  - [x] `defer` — defer a decision with provisional value
+  - [x] `status` — summary counts by state
+- [x] Verification bridge stub (verification_mode mapping)
+
+### Summary
+- `torc-spec`: 7 modules (decision, assumption, graph, history, impact, conflict, serialize)
+- DecisionGraph: HashMap-based storage with decisions, assumptions, history
+- TdgFile: magic 0x54444700, version, flags, counts, JSON payload, SHA-256
+- ~43 tests, 0 clippy warnings
+
+### Deferred
+
+- [ ] Domain-specific impact analysis (needs domain models or LLM)
+- [ ] Automatic conflict detection from values (needs constraint propagation)
+- [ ] Full verification engine integration (needs torc-verify changes)
+- [ ] DecisionView in torc-observe
+- [ ] Progressive deepening (needs domain templates)
+- [ ] Probabilistic specification engine (spec section 14)
+- [ ] Specification workspace UI (spec section 15)
+
+### Acceptance Criteria
+
+- All 7 decision states representable, transition rules enforced
+- DecisionGraph CRUD + state transitions with history recording
+- Assumptions tracked with confidence/impact
+- `.tdg` round-trip works
+- Impact analysis produces conservative but meaningful reports
+- CLI `torc decision` commands work: init, list, show, commit, defer, status
 
 ---
 
@@ -682,31 +763,34 @@ torc/
 
 ## Milestone Targets
 
-### M1: "Hello Graph" — Phases 0-4 complete
+### M1: "Hello Graph" — Phases 0-4 complete ✓
 A Torc graph can be constructed programmatically, serialized to `.trc`, deserialized, and the round-trip verified.
 
-### M2: "Verified Graph" — Phase 6 complete
+### M2: "Verified Graph" — Phase 6 complete ✓
 Proof obligations are generated from contracts and discharged via Z3. Verification reports are produced.
 
-### M3: "First Executable" — Phase 7 (partial) complete
+### M3: "First Executable" — Phase 7 (partial) complete ✓
 A trivial Torc graph materializes to a running Linux x86_64 ELF binary via LLVM.
 
-### M4: "Developer Preview" — Phases 8-10 complete
+### M4: "Developer Preview" — Phases 8-10 complete ✓
 The `torc` CLI supports init, build, verify, and inspect. Platform models are parsed. Observability views work.
 
-### M5: "Interop" — Phase 11 complete
+### M5: "Interop" — Phase 11 complete ✓
 Torc programs can call C libraries and be called from C code.
 
-### M6: "Ecosystem" — Phase 12-13 complete
+### M6: "Ecosystem" — Phase 12-13 complete (partial) ✓
 Packages can be published and fetched. The FOC motor controller example works end-to-end.
+
+### M7: "Specification Interface" — Phase 14 complete
+The Decision State Model enables collaborative specification between humans and AI.
 
 ---
 
 ## Open Questions
 
-1. **Graph library choice:** Use `petgraph` as a foundation or build a custom graph structure optimized for content-addressing and port-based edges?
-2. **Z3 integration strategy:** Vendor Z3 or require it as a system dependency? The `z3` crate supports both.
-3. **LLVM version:** Which LLVM version to target? `inkwell` supports LLVM 14-18. Need to balance feature availability with platform support.
+1. **Graph library choice:** Use `petgraph` as a foundation or build a custom graph structure optimized for content-addressing and port-based edges? **Resolved: Custom.**
+2. **Z3 integration strategy:** Vendor Z3 or require it as a system dependency? The `z3` crate supports both. **Resolved: System dependency, feature-gated.**
+3. **LLVM version:** Which LLVM version to target? `inkwell` supports LLVM 14-18. **Resolved: LLVM 18.**
 4. **Provenance storage:** Store full provenance in-memory or use a separate on-disk database for large projects?
 5. **Incremental materialization strategy:** File-level granularity (re-materialize changed modules) or node-level (patch binary in place)?
 

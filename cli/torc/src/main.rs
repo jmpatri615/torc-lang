@@ -131,6 +131,11 @@ enum Commands {
     },
     /// Audit dependencies for safety and compliance
     Audit,
+    /// Manage design decisions (specification interface)
+    Decision {
+        #[command(subcommand)]
+        action: DecisionAction,
+    },
 }
 
 #[derive(Subcommand)]
@@ -149,6 +154,60 @@ enum FfiAction {
         /// Output file path (for --to-c)
         #[arg(long)]
         output: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum DecisionAction {
+    /// Initialize decision tracking (create decisions.tdg)
+    Init,
+    /// List decisions
+    List {
+        /// Filter by state (e.g., committed, deferred, exploring)
+        #[arg(long)]
+        state: Option<String>,
+        /// Filter by domain (e.g., safety, performance)
+        #[arg(long)]
+        domain: Option<String>,
+    },
+    /// Show full details of a decision
+    Show {
+        /// Decision ID (or prefix)
+        id: String,
+    },
+    /// Commit a decision with a specific value
+    Commit {
+        /// Decision ID (or prefix)
+        id: String,
+        /// The value to commit
+        value: String,
+        /// Rationale for the decision
+        #[arg(long)]
+        rationale: Option<String>,
+    },
+    /// Defer a decision for later
+    Defer {
+        /// Decision ID (or prefix)
+        id: String,
+        /// Provisional value
+        #[arg(long)]
+        provisional: Option<String>,
+        /// Revisit when this decision ID is committed
+        #[arg(long)]
+        revisit_when: Option<String>,
+    },
+    /// Show summary counts by decision state
+    Status,
+    /// Add a new decision
+    Add {
+        /// Decision title
+        title: String,
+        /// Decision domain (e.g., safety, performance, topology)
+        #[arg(long)]
+        domain: String,
+        /// Description
+        #[arg(long)]
+        description: Option<String>,
     },
 }
 
@@ -328,6 +387,77 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             let (manifest, project_dir) = load_manifest_required(&cwd)?;
             commands::registry::audit(&project_dir, &manifest)
         }
+
+        Commands::Decision { action } => match action {
+            DecisionAction::Init => {
+                let project_dir = match load_manifest_optional(&cwd)? {
+                    (_, Some(dir)) => dir,
+                    _ => cwd,
+                };
+                commands::decision::init(&project_dir)
+            }
+            DecisionAction::List { state, domain } => {
+                let (_, project_dir) = load_manifest_optional(&cwd)?;
+                let project_dir = project_dir.unwrap_or(cwd);
+                commands::decision::list(
+                    &project_dir,
+                    state.as_deref(),
+                    domain.as_deref(),
+                )
+            }
+            DecisionAction::Show { id } => {
+                let (_, project_dir) = load_manifest_optional(&cwd)?;
+                let project_dir = project_dir.unwrap_or(cwd);
+                commands::decision::show(&project_dir, &id)
+            }
+            DecisionAction::Commit {
+                id,
+                value,
+                rationale,
+            } => {
+                let (_, project_dir) = load_manifest_optional(&cwd)?;
+                let project_dir = project_dir.unwrap_or(cwd);
+                commands::decision::commit(
+                    &project_dir,
+                    &id,
+                    &value,
+                    rationale.as_deref(),
+                )
+            }
+            DecisionAction::Defer {
+                id,
+                provisional,
+                revisit_when,
+            } => {
+                let (_, project_dir) = load_manifest_optional(&cwd)?;
+                let project_dir = project_dir.unwrap_or(cwd);
+                commands::decision::defer(
+                    &project_dir,
+                    &id,
+                    provisional.as_deref(),
+                    revisit_when.as_deref(),
+                )
+            }
+            DecisionAction::Status => {
+                let (_, project_dir) = load_manifest_optional(&cwd)?;
+                let project_dir = project_dir.unwrap_or(cwd);
+                commands::decision::status(&project_dir)
+            }
+            DecisionAction::Add {
+                title,
+                domain,
+                description,
+            } => {
+                let (_, project_dir) = load_manifest_optional(&cwd)?;
+                let project_dir = project_dir.unwrap_or(cwd);
+                commands::decision::add(
+                    &project_dir,
+                    &title,
+                    &domain,
+                    description.as_deref(),
+                )
+            }
+        },
     }
 }
 
@@ -660,5 +790,228 @@ platform_trusted = ["libm", "libc"]
         assert_eq!(tp.allow_unsafe, Some(false));
         assert_eq!(tp.require_audited, Some(true));
         assert_eq!(tp.platform_trusted.len(), 2);
+    }
+
+    /// Decision: init creates decisions.tdg.
+    #[test]
+    fn decision_init() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("decision-test");
+        commands::init::create_project(&project_path, "decision-test").unwrap();
+
+        commands::decision::init(&project_path).unwrap();
+        assert!(project_path.join("spec/decisions.tdg").is_file());
+    }
+
+    /// Decision: init is idempotent.
+    #[test]
+    fn decision_init_idempotent() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("decision-idem");
+        commands::init::create_project(&project_path, "decision-idem").unwrap();
+
+        commands::decision::init(&project_path).unwrap();
+        commands::decision::init(&project_path).unwrap(); // second call should not fail
+    }
+
+    /// Decision: status on empty graph.
+    #[test]
+    fn decision_status_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("decision-status");
+        commands::init::create_project(&project_path, "decision-status").unwrap();
+        commands::decision::init(&project_path).unwrap();
+
+        commands::decision::status(&project_path).unwrap();
+    }
+
+    /// Decision: add, list, show, commit, defer workflow.
+    #[test]
+    fn decision_full_workflow() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("decision-flow");
+        commands::init::create_project(&project_path, "decision-flow").unwrap();
+        commands::decision::init(&project_path).unwrap();
+
+        // Add a decision
+        commands::decision::add(
+            &project_path,
+            "PWM Frequency",
+            "performance",
+            Some("Select the PWM switching frequency"),
+        ).unwrap();
+
+        // Add another
+        commands::decision::add(
+            &project_path,
+            "Control topology",
+            "topology",
+            None,
+        ).unwrap();
+
+        // List should show 2
+        commands::decision::list(&project_path, None, None).unwrap();
+
+        // Status should show 2 unexplored
+        commands::decision::status(&project_path).unwrap();
+    }
+
+    /// Decision: show displays decision details.
+    #[test]
+    fn decision_show() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("decision-show");
+        commands::init::create_project(&project_path, "decision-show").unwrap();
+        commands::decision::init(&project_path).unwrap();
+
+        commands::decision::add(
+            &project_path,
+            "Safety Mode",
+            "safety",
+            Some("Define safe state behavior"),
+        ).unwrap();
+
+        // Load graph to get the decision ID prefix
+        let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
+        let tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
+        let decision = tdg.graph.decisions().next().unwrap();
+        let id_prefix = &decision.id.to_string()[..8];
+
+        // Show should succeed and not error
+        commands::decision::show(&project_path, id_prefix).unwrap();
+    }
+
+    /// Decision: commit transitions state and persists.
+    #[test]
+    fn decision_commit() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("decision-commit");
+        commands::init::create_project(&project_path, "decision-commit").unwrap();
+        commands::decision::init(&project_path).unwrap();
+
+        commands::decision::add(
+            &project_path,
+            "Control Loop Rate",
+            "performance",
+            None,
+        ).unwrap();
+
+        // Get the decision ID
+        let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
+        let tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
+        let decision = tdg.graph.decisions().next().unwrap();
+        let id_prefix = &decision.id.to_string()[..8];
+
+        // Commit should succeed
+        commands::decision::commit(
+            &project_path,
+            id_prefix,
+            "20kHz",
+            Some("Standard FOC rate"),
+        ).unwrap();
+
+        // Verify the state persisted as COMMITTED
+        let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
+        let tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
+        let updated = tdg.graph.decisions().next().unwrap();
+        assert_eq!(updated.state, torc_spec::DecisionState::Committed);
+    }
+
+    /// Decision: defer transitions state with provisional value.
+    #[test]
+    fn decision_defer() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("decision-defer");
+        commands::init::create_project(&project_path, "decision-defer").unwrap();
+        commands::decision::init(&project_path).unwrap();
+
+        commands::decision::add(
+            &project_path,
+            "CAN Protocol Version",
+            "communication",
+            None,
+        ).unwrap();
+
+        let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
+        let tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
+        let decision = tdg.graph.decisions().next().unwrap();
+        let id_prefix = &decision.id.to_string()[..8];
+
+        // Defer with provisional value
+        commands::decision::defer(
+            &project_path,
+            id_prefix,
+            Some("CAN 2.0B"),
+            None,
+        ).unwrap();
+
+        // Verify state persisted as DEFERRED
+        let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
+        let tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
+        let updated = tdg.graph.decisions().next().unwrap();
+        assert_eq!(updated.state, torc_spec::DecisionState::Deferred);
+    }
+
+    /// Decision: list --state filter works correctly.
+    #[test]
+    fn decision_list_state_filter() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("decision-filter");
+        commands::init::create_project(&project_path, "decision-filter").unwrap();
+        commands::decision::init(&project_path).unwrap();
+
+        // Add two decisions
+        commands::decision::add(&project_path, "Decision A", "safety", None).unwrap();
+        commands::decision::add(&project_path, "Decision B", "performance", None).unwrap();
+
+        // Commit one
+        let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
+        let tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
+        let first = tdg.graph.decisions().next().unwrap();
+        let id_prefix = &first.id.to_string()[..8];
+        commands::decision::commit(&project_path, id_prefix, "yes", None).unwrap();
+
+        // List with state filter should succeed (exercises the fixed != -> == path)
+        commands::decision::list(&project_path, Some("committed"), None).unwrap();
+        commands::decision::list(&project_path, Some("unexplored"), None).unwrap();
+
+        // Verify via graph: exactly 1 committed, 1 unexplored
+        let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
+        let tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
+        let committed: Vec<_> = tdg.graph
+            .decisions_by_state(torc_spec::DecisionState::Committed);
+        let unexplored: Vec<_> = tdg.graph
+            .decisions_by_state(torc_spec::DecisionState::Unexplored);
+        assert_eq!(committed.len(), 1, "should have 1 committed decision");
+        assert_eq!(unexplored.len(), 1, "should have 1 unexplored decision");
+    }
+
+    /// Decision: commit records history with timestamp.
+    #[test]
+    fn decision_history_has_timestamp() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("decision-ts");
+        commands::init::create_project(&project_path, "decision-ts").unwrap();
+        commands::decision::init(&project_path).unwrap();
+
+        commands::decision::add(&project_path, "Timing", "performance", None).unwrap();
+
+        let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
+        let tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
+        let decision = tdg.graph.decisions().next().unwrap();
+        let id_prefix = &decision.id.to_string()[..8];
+
+        commands::decision::commit(&project_path, id_prefix, "10kHz", None).unwrap();
+
+        // Load and check history has a timestamp
+        let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
+        let tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
+        let history = tdg.graph.history_for(decision.id);
+        assert_eq!(history.len(), 1, "should have 1 history entry");
+        assert!(
+            history[0].timestamp.contains('T') && history[0].timestamp.ends_with('Z'),
+            "timestamp should be ISO 8601: {}",
+            history[0].timestamp
+        );
     }
 }

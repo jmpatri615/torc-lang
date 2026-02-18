@@ -9,8 +9,10 @@ members = [
     "crates/torc-ffi",
     "crates/torc-observe",
     "crates/torc-registry",
+    "crates/torc-spec",
     "cli/torc",
     "examples/foc-controller",
+    "examples/checksum",
 ]
 
 [workspace.package]
@@ -29,6 +31,7 @@ torc-targets = { path = "crates/torc-targets" }
 torc-ffi = { path = "crates/torc-ffi" }
 torc-observe = { path = "crates/torc-observe" }
 torc-registry = { path = "crates/torc-registry" }
+torc-spec = { path = "crates/torc-spec" }
 
 # Shared external dependencies
 uuid = { version = "1", features = ["v4", "serde"] }

@@ -1,9 +1,9 @@
-//! FOC Motor Controller — binary entry point.
+//! Internet Checksum — binary entry point.
 //!
 //! Usage:
-//!   cargo run -p foc-controller [-- <output-dir>]
+//!   cargo run -p checksum [-- <output-dir>]
 //!
-//! Default output directory: /tmp/foc-controller
+//! Default output directory: /tmp/checksum
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -12,15 +12,14 @@ use torc_trc::TrcFile;
 
 fn write_manifest(dir: &Path) {
     let manifest = r#"[project]
-name = "foc-controller"
+name = "checksum"
 version = "0.1.0"
-description = "Brushless DC motor field-oriented control"
+description = "Internet-style ones' complement checksum"
 authors = ["ai:claude-opus-4-6@anthropic/20260217"]
 license = "MIT"
-safety = "ASIL-B"
 
 [targets]
-default = "stm32f407-discovery"
+default = "linux-x86_64"
 
 [verification]
 profile = "development"
@@ -36,18 +35,20 @@ fn write_gitignore(dir: &Path) {
 fn main() {
     let out_dir: PathBuf = std::env::args()
         .nth(1)
-        .unwrap_or_else(|| "/tmp/foc-controller".into())
+        .unwrap_or_else(|| "/tmp/checksum".into())
         .into();
 
-    println!("Building FOC motor controller graph...");
-    let graph = foc_controller::build_graph();
+    println!("Building Internet checksum graph...");
+    let graph = checksum::build_graph();
 
     println!("  nodes:   {}", graph.node_count());
     println!("  edges:   {}", graph.edge_count());
     println!("  regions: {}", graph.region_count());
 
     // Verify topological sort succeeds
-    let topo = graph.topological_sort().expect("graph has unexpected cycles");
+    let topo = graph
+        .topological_sort()
+        .expect("graph has unexpected cycles");
     println!("  topo order: {} nodes (DAG verified)", topo.len());
 
     // Serialize to TRC

@@ -14,6 +14,7 @@ torc-targets = { workspace = true }
 torc-ffi = { workspace = true }
 torc-observe = { workspace = true }
 torc-registry = { workspace = true }
+torc-spec = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

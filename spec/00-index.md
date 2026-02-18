@@ -22,6 +22,9 @@
 10. [Formal Verification Framework](./10-verification.md)
 11. [Interoperability and FFI](./11-interoperability.md)
 12. [Example: A Complete Application](./12-example-application.md)
+13. [The Specification Interface: Collaborative Intent Resolution](./13-specification-interface.md)
+14. [Probabilistic Specification Engine](./14-probabilistic-specification-engine.md)
+15. [The Specification Workspace](./15-specification-workspace.md)
 
 ---
 

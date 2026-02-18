@@ -1,16 +1,16 @@
 [package]
-name = "foc-controller"
+name = "checksum"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
 
 [lib]
-name = "foc_controller"
+name = "checksum"
 path = "src/lib.rs"
 
 [[bin]]
-name = "foc-controller"
+name = "checksum"
 path = "src/main.rs"
 
 [dependencies]

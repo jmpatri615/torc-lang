@@ -2,6 +2,7 @@
 
 pub mod build;
 pub mod clean;
+pub mod decision;
 pub mod doctor;
 pub mod ffi;
 pub mod init;
