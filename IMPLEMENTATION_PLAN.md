@@ -2,7 +2,7 @@
 
 **Version:** 0.1.0
 **Last Updated:** 2026-02-17
-**Status:** Phase 14 — In Progress
+**Status:** Phase 14 — Complete
 
 ---
 
@@ -685,19 +685,30 @@ torc/
   - [x] `defer` — defer a decision with provisional value
   - [x] `status` — summary counts by state
 - [x] Verification bridge stub (verification_mode mapping)
+- [x] **Pass 2: Decision-System Integration**
+  - [x] Verification bridge (`torc-spec/src/bridge.rs`): decision_aware_profile(), check_materialization_readiness()
+  - [x] DecisionView in torc-observe (6th observability view): summary, table, assumptions, verification impact
+  - [x] RenderContext extended with optional DecisionGraph
+  - [x] SpecConfig in manifest (decisions_path with default)
+  - [x] load_tdg_optional() for cross-command TDG loading
+  - [x] `torc verify` integrates decision-aware profile upgrades
+  - [x] `torc build` blocks on conflicted decisions, warns on unexplored safety
+  - [x] `torc inspect --view decision` dispatches to DecisionView
 
 ### Summary
-- `torc-spec`: 7 modules (decision, assumption, graph, history, impact, conflict, serialize)
+- `torc-spec`: 8 modules (decision, assumption, graph, history, impact, conflict, serialize, bridge)
 - DecisionGraph: HashMap-based storage with decisions, assumptions, history
 - TdgFile: magic 0x54444700, version, flags, counts, JSON payload, SHA-256
-- ~43 tests, 0 clippy warnings
+- Verification bridge: conflicted → certification, tentative → integration, else passthrough
+- Materialization readiness: errors on conflicts, warnings on unexplored safety
+- ~500 tests across workspace, 0 clippy warnings
 
 ### Deferred
 
 - [ ] Domain-specific impact analysis (needs domain models or LLM)
 - [ ] Automatic conflict detection from values (needs constraint propagation)
-- [ ] Full verification engine integration (needs torc-verify changes)
-- [ ] DecisionView in torc-observe
+- [ ] Decision-aware resource estimation in materialize
+- [ ] DecisionView CSV/PDF export
 - [ ] Progressive deepening (needs domain templates)
 - [ ] Probabilistic specification engine (spec section 14)
 - [ ] Specification workspace UI (spec section 15)
@@ -781,8 +792,8 @@ Torc programs can call C libraries and be called from C code.
 ### M6: "Ecosystem" — Phase 12-13 complete (partial) ✓
 Packages can be published and fetched. The FOC motor controller example works end-to-end.
 
-### M7: "Specification Interface" — Phase 14 complete
-The Decision State Model enables collaborative specification between humans and AI.
+### M7: "Specification Interface" — Phase 14 complete ✓
+The Decision State Model enables collaborative specification between humans and AI. Full toolchain integration: decisions influence verification profiles, block builds on conflicts, and are visible through the observability layer.
 
 ---
 

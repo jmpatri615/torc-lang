@@ -10,6 +10,7 @@
 //! recorded with full rationale.
 
 pub mod assumption;
+pub mod bridge;
 pub mod conflict;
 pub mod decision;
 pub mod error;
@@ -30,4 +31,5 @@ pub use history::StateTransition;
 pub use impact::{
     analyze_commit_impact, Concern, ConcernSeverity, DerivedConsequence, Exclusion, ImpactReport,
 };
+pub use bridge::{check_materialization_readiness, decision_aware_profile, ReadinessIssue, Severity};
 pub use serialize::TdgFile;

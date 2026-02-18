@@ -5,6 +5,7 @@
 
 pub mod contract_table;
 pub mod dataflow;
+pub mod decision_view;
 pub mod error;
 pub mod format;
 pub mod provenance;
@@ -14,6 +15,7 @@ pub mod view;
 
 pub use contract_table::ContractView;
 pub use dataflow::DataflowView;
+pub use decision_view::DecisionView;
 pub use error::ObserveError;
 pub use format::{bar_chart, format_bytes, format_predicate, format_time_ns, node_display_name};
 pub use provenance::ProvenanceView;

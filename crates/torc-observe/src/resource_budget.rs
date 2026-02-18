@@ -188,6 +188,7 @@ mod tests {
             platform: Some(&platform),
             resource_report: None,
             schedule: None,
+            decision_graph: None,
         };
         let output = view.render(&g, &ctx).unwrap();
         assert!(output.text.contains("linux-x86_64"));
@@ -208,6 +209,7 @@ mod tests {
             platform: Some(&platform),
             resource_report: None,
             schedule: None,
+            decision_graph: None,
         };
         let output = view.render(&g, &ctx).unwrap();
         assert!(output.text.contains("Flash:"));
@@ -230,6 +232,7 @@ mod tests {
             platform: Some(&platform),
             resource_report: None,
             schedule: None,
+            decision_graph: None,
         };
         let output = view.render(&g, &ctx).unwrap();
         assert!(output.text.contains("50.0us"));
@@ -250,6 +253,7 @@ mod tests {
             platform: Some(&platform),
             resource_report: None,
             schedule: None,
+            decision_graph: None,
         };
         let output = view.render(&g, &ctx).unwrap();
         assert_eq!(output.data["view"], "resources");
@@ -295,6 +299,7 @@ mod tests {
             platform: Some(&platform),
             resource_report: Some(&report),
             schedule: None,
+            decision_graph: None,
         };
 
         let output = view.render(&g, &ctx).unwrap();

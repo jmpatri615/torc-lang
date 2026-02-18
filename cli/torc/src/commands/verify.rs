@@ -4,10 +4,12 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{bail, Context, Result};
+use torc_spec::bridge::decision_aware_profile;
 use torc_trc::TrcFile;
 use torc_verify::engine::VerificationEngine;
 use torc_verify::profile::VerificationProfile;
 
+use crate::commands::decision::load_tdg_optional;
 use crate::manifest::TorcManifest;
 
 /// Run verification on a Torc graph.
@@ -42,7 +44,27 @@ pub fn run(
     let effective_profile = profile.or_else(|| {
         manifest.and_then(|m| m.default_verification_profile())
     });
-    let vprofile = resolve_profile(effective_profile)?;
+    let mut vprofile = resolve_profile(effective_profile)?;
+
+    // Decision-aware profile adjustment
+    let decision_graph = load_tdg_optional(project_dir);
+    if let Some(ref dg) = decision_graph {
+        use torc_spec::decision::DecisionState;
+
+        let has_conflicted = dg.decisions().any(|d| d.state == DecisionState::Conflicted);
+        if has_conflicted {
+            eprintln!("warning: Decision conflict detected — verification may be incomplete");
+        }
+
+        let original_level = vprofile.level;
+        vprofile = decision_aware_profile(dg, vprofile);
+        if vprofile.level != original_level {
+            println!(
+                "note: Verification profile upgraded to {:?} due to decision state",
+                vprofile.level
+            );
+        }
+    }
 
     // Run verification
     let mut engine = VerificationEngine::new(vprofile);

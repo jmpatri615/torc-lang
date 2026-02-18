@@ -4,6 +4,7 @@ use serde_json::Value;
 use torc_core::graph::Graph;
 use torc_materialize::resource::ResourceReport;
 use torc_materialize::schedule::ExecutionSchedule;
+use torc_spec::DecisionGraph;
 use torc_targets::Platform;
 
 use crate::error::ObserveError;
@@ -16,6 +17,7 @@ pub enum ViewKind {
     ResourceBudget,
     Dataflow,
     Provenance,
+    Decision,
 }
 
 impl ViewKind {
@@ -27,6 +29,7 @@ impl ViewKind {
             "resources" | "resource-budget" => Ok(ViewKind::ResourceBudget),
             "dataflow" => Ok(ViewKind::Dataflow),
             "provenance" => Ok(ViewKind::Provenance),
+            "decision" | "decisions" => Ok(ViewKind::Decision),
             _ => Err(ObserveError::UnknownView {
                 name: s.to_string(),
             }),
@@ -41,6 +44,7 @@ impl ViewKind {
             ViewKind::ResourceBudget => "resources",
             ViewKind::Dataflow => "dataflow",
             ViewKind::Provenance => "provenance",
+            ViewKind::Decision => "decision",
         }
     }
 }
@@ -90,6 +94,8 @@ pub struct RenderContext<'a> {
     pub resource_report: Option<&'a ResourceReport>,
     /// Optional execution schedule (pre-computed).
     pub schedule: Option<&'a ExecutionSchedule>,
+    /// Optional decision graph (needed for decision view).
+    pub decision_graph: Option<&'a DecisionGraph>,
 }
 
 impl<'a> RenderContext<'a> {
@@ -99,6 +105,7 @@ impl<'a> RenderContext<'a> {
             platform: None,
             resource_report: None,
             schedule: None,
+            decision_graph: None,
         }
     }
 }
@@ -120,6 +127,7 @@ pub fn available_views() -> &'static [ViewKind] {
         ViewKind::ResourceBudget,
         ViewKind::Dataflow,
         ViewKind::Provenance,
+        ViewKind::Decision,
     ]
 }
 
@@ -137,6 +145,8 @@ mod tests {
         assert_eq!(ViewKind::parse("resource-budget").unwrap(), ViewKind::ResourceBudget);
         assert_eq!(ViewKind::parse("dataflow").unwrap(), ViewKind::Dataflow);
         assert_eq!(ViewKind::parse("provenance").unwrap(), ViewKind::Provenance);
+        assert_eq!(ViewKind::parse("decision").unwrap(), ViewKind::Decision);
+        assert_eq!(ViewKind::parse("decisions").unwrap(), ViewKind::Decision);
     }
 
     #[test]

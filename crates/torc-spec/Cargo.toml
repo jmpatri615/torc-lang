@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 torc-core = { workspace = true }
+torc-verify = { workspace = true }
 uuid = { workspace = true }
 sha2 = { workspace = true }
 serde = { workspace = true }

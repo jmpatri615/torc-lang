@@ -5,11 +5,12 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use torc_observe::{
-    available_views, ContractView, DataflowView, ProvenanceView, PseudoCodeView,
+    available_views, ContractView, DataflowView, DecisionView, ProvenanceView, PseudoCodeView,
     RenderContext, ResourceBudgetView, View, ViewFormat, ViewKind,
 };
 use torc_trc::TrcFile;
 
+use crate::commands::decision::load_tdg_optional;
 use crate::manifest::resolve_target;
 
 /// Inspect a Torc graph with optional view selection.
@@ -73,11 +74,24 @@ pub fn run(
         None
     };
 
+    // Load decision graph only when needed (decision view)
+    let decision_graph = if view_kind == ViewKind::Decision {
+        let dg = load_tdg_optional(project_dir);
+        if dg.is_none() {
+            println!("No decisions.tdg found. Run `torc decision init` to create one.");
+            return Ok(());
+        }
+        dg
+    } else {
+        None
+    };
+
     // Build render context
     let ctx = RenderContext {
         platform: platform.as_ref(),
         resource_report: None,
         schedule: None,
+        decision_graph: decision_graph.as_ref(),
     };
 
     // Dispatch to view
@@ -87,6 +101,7 @@ pub fn run(
         ViewKind::ResourceBudget => Box::new(ResourceBudgetView),
         ViewKind::Dataflow => Box::new(DataflowView),
         ViewKind::Provenance => Box::new(ProvenanceView),
+        ViewKind::Decision => Box::new(DecisionView),
     };
 
     let output = view_impl
@@ -106,6 +121,7 @@ fn view_description(kind: &ViewKind) -> &'static str {
         ViewKind::ResourceBudget => "Memory/timing bar charts (needs --target)",
         ViewKind::Dataflow => "Level-grouped dataflow graph",
         ViewKind::Provenance => "Creation and edit history per node",
+        ViewKind::Decision => "Decision state summary and verification impact",
     }
 }
 

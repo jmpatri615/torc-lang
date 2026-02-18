@@ -8,6 +8,37 @@ use torc_spec::{Decision, DecisionGraph, DecisionValue, TdgFile};
 /// Default path for the decision graph file.
 const DEFAULT_TDG_PATH: &str = "spec/decisions.tdg";
 
+/// Try to load a TDG file, returning None if it doesn't exist.
+///
+/// This is used by other commands (verify, build, inspect) that optionally
+/// integrate with the decision system. Returns `Some(graph)` if the file
+/// exists and parses, `None` if missing, and prints a warning if corrupt.
+pub fn load_tdg_optional(project_dir: &Path) -> Option<DecisionGraph> {
+    let tdg_path = project_dir.join(DEFAULT_TDG_PATH);
+    if !tdg_path.is_file() {
+        return None;
+    }
+    match std::fs::read(&tdg_path) {
+        Ok(data) => match TdgFile::from_bytes(&data) {
+            Ok(tdg) => Some(tdg.graph),
+            Err(e) => {
+                eprintln!(
+                    "warning: corrupt decisions.tdg at {} — {e}",
+                    tdg_path.display()
+                );
+                None
+            }
+        },
+        Err(e) => {
+            eprintln!(
+                "warning: could not read {} — {e}",
+                tdg_path.display()
+            );
+            None
+        }
+    }
+}
+
 /// Load the decision graph from a TDG file.
 fn load_tdg(project_dir: &Path) -> anyhow::Result<(DecisionGraph, std::path::PathBuf)> {
     let tdg_path = project_dir.join(DEFAULT_TDG_PATH);

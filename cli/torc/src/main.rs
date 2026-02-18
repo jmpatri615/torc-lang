@@ -68,7 +68,7 @@ enum Commands {
     },
     /// Inspect a Torc graph
     Inspect {
-        /// View mode (pseudo-code, contracts, resources, dataflow, provenance)
+        /// View mode (pseudo-code, contracts, resources, dataflow, provenance, decision)
         #[arg(long)]
         view: Option<String>,
         /// Input .trc file (default: graph/main.trc)
@@ -984,6 +984,181 @@ platform_trusted = ["libm", "libc"]
             .decisions_by_state(torc_spec::DecisionState::Unexplored);
         assert_eq!(committed.len(), 1, "should have 1 committed decision");
         assert_eq!(unexplored.len(), 1, "should have 1 unexplored decision");
+    }
+
+    /// Verify with no TDG — unchanged behavior.
+    #[test]
+    fn verify_no_tdg_unchanged() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("verify-no-tdg");
+        commands::init::create_project(&project_path, "verify-no-tdg").unwrap();
+
+        // No decisions.tdg — verify should work exactly as before
+        commands::verify::run(
+            &project_path,
+            None,
+            None,
+            false,
+            None,
+            None,
+            false,
+        )
+        .unwrap();
+    }
+
+    /// Verify with TDG present — profile upgrade note.
+    #[test]
+    fn verify_with_tdg_tentative() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("verify-tdg");
+        commands::init::create_project(&project_path, "verify-tdg").unwrap();
+
+        // Create a TDG with a tentative decision
+        commands::decision::init(&project_path).unwrap();
+        commands::decision::add(
+            &project_path, "Control method", "topology", None,
+        ).unwrap();
+
+        // Get the decision ID and transition to Tentative
+        let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
+        let mut tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
+        let decision = tdg.graph.decisions().next().unwrap();
+        let id = decision.id;
+        tdg.graph.transition(
+            id,
+            torc_spec::DecisionState::Tentative,
+            torc_spec::DecisionValue::Provisional("FOC".into()),
+            None,
+        ).unwrap();
+        let bytes = torc_spec::TdgFile::new(tdg.graph).to_bytes().unwrap();
+        std::fs::write(project_path.join("spec/decisions.tdg"), bytes).unwrap();
+
+        // Verify should succeed — profile is upgraded but no error
+        commands::verify::run(
+            &project_path,
+            None,
+            None,
+            false,
+            None,
+            None,
+            false,
+        )
+        .unwrap();
+    }
+
+    /// Build blocks on conflicted decisions.
+    #[test]
+    fn build_blocks_on_conflict() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("build-conflict");
+        commands::init::create_project(&project_path, "build-conflict").unwrap();
+
+        // Create a TDG with a conflicted decision
+        commands::decision::init(&project_path).unwrap();
+        commands::decision::add(
+            &project_path, "Bus protocol", "comms", None,
+        ).unwrap();
+
+        let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
+        let mut tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
+        let decision = tdg.graph.decisions().next().unwrap();
+        let id = decision.id;
+        // Unexplored → Exploring → Conflicted (valid path)
+        tdg.graph.transition(
+            id,
+            torc_spec::DecisionState::Exploring,
+            torc_spec::DecisionValue::Unresolved,
+            None,
+        ).unwrap();
+        tdg.graph.transition(
+            id,
+            torc_spec::DecisionState::Conflicted,
+            torc_spec::DecisionValue::Unresolved,
+            None,
+        ).unwrap();
+        let bytes = torc_spec::TdgFile::new(tdg.graph).to_bytes().unwrap();
+        std::fs::write(project_path.join("spec/decisions.tdg"), bytes).unwrap();
+
+        // Build should fail
+        let result = commands::build::run(
+            &project_path,
+            None,
+            None,
+            None,
+            false,
+            false,
+            None,
+            None,
+            false,
+        );
+        assert!(result.is_err(), "build should be blocked by conflicted decisions");
+    }
+
+    /// Build warns on unexplored safety decisions but doesn't block.
+    #[test]
+    fn build_warns_on_unexplored_safety() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("build-safety-warn");
+        commands::init::create_project(&project_path, "build-safety-warn").unwrap();
+
+        // Create a TDG with an unexplored safety decision
+        commands::decision::init(&project_path).unwrap();
+        commands::decision::add(
+            &project_path, "Safety monitor", "safety", None,
+        ).unwrap();
+
+        // Build should succeed (warning only, no block)
+        commands::build::run(
+            &project_path,
+            None,
+            None,
+            None,
+            false,
+            false,
+            None,
+            None,
+            false,
+        ).unwrap();
+    }
+
+    /// Inspect --view decision dispatches correctly.
+    #[test]
+    fn inspect_decision_view() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("inspect-decision");
+        commands::init::create_project(&project_path, "inspect-decision").unwrap();
+
+        // Create decisions.tdg
+        commands::decision::init(&project_path).unwrap();
+        commands::decision::add(
+            &project_path, "PWM freq", "performance", None,
+        ).unwrap();
+
+        // inspect --view decision should succeed
+        commands::inspect::run(
+            &project_path,
+            Some("decision"),
+            None,
+            None,
+            None,
+        ).unwrap();
+    }
+
+    /// Inspect --view decision with no TDG prints helpful message.
+    #[test]
+    fn inspect_decision_no_tdg() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_path = dir.path().join("inspect-no-tdg");
+        commands::init::create_project(&project_path, "inspect-no-tdg").unwrap();
+
+        // No decisions.tdg — should not error, just print helpful message
+        commands::inspect::run(
+            &project_path,
+            Some("decision"),
+            None,
+            None,
+            None,
+        ).unwrap();
     }
 
     /// Decision: commit records history with timestamp.

@@ -26,6 +26,9 @@ pub struct TorcManifest {
     /// Registry configuration (parsed but unused until Phase 12).
     #[serde(default)]
     pub registry: Option<RegistryConfig>,
+    /// Specification interface configuration.
+    #[serde(default)]
+    pub spec: Option<SpecConfig>,
 }
 
 /// Project metadata section.
@@ -152,6 +155,18 @@ pub struct RegistryConfig {
     pub reject_unsigned: Option<bool>,
 }
 
+/// Specification interface configuration section.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpecConfig {
+    /// Path to the decisions.tdg file (relative to project root).
+    #[serde(default = "default_decisions_path")]
+    pub decisions_path: String,
+}
+
+fn default_decisions_path() -> String {
+    "spec/decisions.tdg".to_string()
+}
+
 impl TorcManifest {
     /// Search upward from `start_dir` for a `torc.toml` file, parse and return it
     /// along with the directory it was found in.
@@ -186,6 +201,15 @@ impl TorcManifest {
             .and_then(|t| t.default.as_deref())
     }
 
+    /// Resolve the decisions.tdg path from the manifest (or use default).
+    #[allow(dead_code)]
+    pub fn decisions_path(&self) -> &str {
+        self.spec
+            .as_ref()
+            .map(|s| s.decisions_path.as_str())
+            .unwrap_or("spec/decisions.tdg")
+    }
+
     /// Resolve the default verification profile from the manifest.
     pub fn default_verification_profile(&self) -> Option<&str> {
         self.verification
@@ -205,6 +229,9 @@ default = "linux-x86_64"
 
 [verification]
 profile = "development"
+
+# [spec]
+# decisions_path = "spec/decisions.tdg"
 "#
         )
     }
@@ -376,6 +403,29 @@ enforce_resources = true
         let (manifest, found_dir) = result.unwrap();
         assert_eq!(manifest.project.name, "parent");
         assert_eq!(found_dir, dir.path());
+    }
+
+    #[test]
+    fn parse_manifest_with_spec_section() {
+        let toml_str = r#"
+[project]
+name = "spec-test"
+
+[spec]
+decisions_path = "my/custom/decisions.tdg"
+"#;
+        let manifest = TorcManifest::from_str(toml_str).unwrap();
+        assert_eq!(manifest.decisions_path(), "my/custom/decisions.tdg");
+    }
+
+    #[test]
+    fn default_decisions_path_when_section_omitted() {
+        let toml_str = r#"
+[project]
+name = "no-spec"
+"#;
+        let manifest = TorcManifest::from_str(toml_str).unwrap();
+        assert_eq!(manifest.decisions_path(), "spec/decisions.tdg");
     }
 
     #[test]

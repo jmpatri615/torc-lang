@@ -11,6 +11,9 @@ use torc_materialize::{materialize, MaterializationReport};
 use torc_targets::Platform;
 use torc_trc::TrcFile;
 
+use torc_spec::bridge::decision_aware_profile;
+
+use crate::commands::decision::load_tdg_optional;
 use crate::manifest::{resolve_target, TorcManifest};
 
 /// Run the build pipeline.
@@ -29,6 +32,33 @@ pub fn run(
     // Resolve targets
     let platforms = resolve_platforms(target, all_targets, manifest)?;
 
+    // Decision readiness check + gate profile adjustment
+    let decision_graph = load_tdg_optional(project_dir);
+    let gate_profile = if let Some(ref dg) = decision_graph {
+        use torc_spec::bridge::{check_materialization_readiness, Severity};
+
+        if let Err(issues) = check_materialization_readiness(dg) {
+            let has_errors = issues.iter().any(|i| i.severity == Severity::Error);
+            for issue in &issues {
+                match issue.severity {
+                    Severity::Error => eprintln!("error: {}", issue.message),
+                    Severity::Warning => eprintln!("warning: {}", issue.message),
+                }
+            }
+            if has_errors {
+                bail!("Build blocked by decision conflicts. Resolve them with `torc decision` before building.");
+            }
+        }
+
+        // Upgrade gate verification profile based on decision state
+        Some(decision_aware_profile(
+            dg,
+            torc_verify::profile::VerificationProfile::development(),
+        ))
+    } else {
+        None
+    };
+
     for platform in &platforms {
         build_for_target(
             project_dir,
@@ -39,6 +69,7 @@ pub fn run(
             profile,
             emit,
             check_resources,
+            gate_profile.as_ref(),
         )?;
     }
 
@@ -55,6 +86,7 @@ fn build_for_target(
     profile: Option<&str>,
     emit: Option<&str>,
     check_resources: bool,
+    gate_profile: Option<&torc_verify::profile::VerificationProfile>,
 ) -> Result<()> {
     // Load graph
     let graph_path = match input {
@@ -76,17 +108,27 @@ fn build_for_target(
 
     println!("Target: {}", platform.name);
 
+    // Build gate config, optionally with decision-adjusted profile
+    let gate = match gate_profile {
+        Some(vp) => GateConfig {
+            profile: vp.clone(),
+            strict: false,
+            max_waivers: None,
+        },
+        None => GateConfig::development(),
+    };
+
     // Resolve emit mode
     let emit_mode = emit.unwrap_or("graph-stats");
 
     // Check resources only mode
     if check_resources {
-        return run_check_resources(trc.graph, platform);
+        return run_check_resources(trc.graph, platform, gate);
     }
 
     // Graph stats only (no codegen needed)
     if emit_mode == "graph-stats" {
-        return run_graph_stats(trc.graph, platform);
+        return run_graph_stats(trc.graph, platform, gate);
     }
 
     // LLVM codegen modes
@@ -100,6 +142,7 @@ fn build_for_target(
                 release,
                 profile,
                 project_dir,
+                gate,
             )
         }
         other => bail!(
@@ -108,7 +151,7 @@ fn build_for_target(
     }
     #[cfg(not(feature = "llvm"))]
     {
-        let _ = (release, profile);
+        let _ = (release, profile, gate);
         bail!(
             "LLVM code generation is not available.\n\
              Rebuild torc with LLVM support:\n  \
@@ -174,10 +217,10 @@ fn resolve_platforms(
     Ok(vec![Platform::generic_linux_x86_64()])
 }
 
-fn run_check_resources(graph: torc_core::graph::Graph, platform: Platform) -> Result<()> {
+fn run_check_resources(graph: torc_core::graph::Graph, platform: Platform, gate: GateConfig) -> Result<()> {
     let config = PipelineConfig {
         platform,
-        gate: GateConfig::development(),
+        gate,
         transforms: TransformRegistry::new(),
         enforce_resource_fit: false,
         #[cfg(feature = "llvm")]
@@ -191,10 +234,10 @@ fn run_check_resources(graph: torc_core::graph::Graph, platform: Platform) -> Re
     Ok(())
 }
 
-fn run_graph_stats(graph: torc_core::graph::Graph, platform: Platform) -> Result<()> {
+fn run_graph_stats(graph: torc_core::graph::Graph, platform: Platform, gate: GateConfig) -> Result<()> {
     let config = PipelineConfig {
         platform,
-        gate: GateConfig::development(),
+        gate,
         transforms: TransformRegistry::new(),
         enforce_resource_fit: false,
         #[cfg(feature = "llvm")]
@@ -214,6 +257,7 @@ fn run_codegen(
     release: bool,
     profile: Option<&str>,
     project_dir: &Path,
+    gate: GateConfig,
 ) -> Result<()> {
     use torc_materialize::codegen::{CodegenConfig, EmitTarget};
 
@@ -231,7 +275,7 @@ fn run_codegen(
 
     let config = PipelineConfig {
         platform,
-        gate: GateConfig::development(),
+        gate,
         transforms: TransformRegistry::new(),
         enforce_resource_fit: false,
         codegen: Some(CodegenConfig {

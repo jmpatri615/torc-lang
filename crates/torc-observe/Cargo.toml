@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 torc-core = { workspace = true }
 torc-materialize = { workspace = true }
+torc-spec = { workspace = true }
 torc-targets = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
