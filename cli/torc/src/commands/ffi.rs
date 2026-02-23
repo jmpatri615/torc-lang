@@ -122,7 +122,7 @@ fn resolve_policy(manifest: Option<&TorcManifest>) -> torc_ffi::TrustPolicy {
 
 fn to_trust_policy(tp: &FfiTrustPolicy) -> torc_ffi::TrustPolicy {
     torc_ffi::TrustPolicy {
-        allow_unsafe: tp.allow_unsafe.unwrap_or(true),
+        allow_unsafe: tp.allow_unsafe.unwrap_or(false),
         require_audited: tp.require_audited.unwrap_or(false),
         platform_trusted: tp.platform_trusted.clone(),
     }

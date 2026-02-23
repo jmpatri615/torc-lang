@@ -2,6 +2,9 @@
 
 use thiserror::Error;
 
+/// Convenience alias for results within the observe crate.
+pub type Result<T> = std::result::Result<T, ObserveError>;
+
 /// Errors that can occur during view rendering.
 #[derive(Debug, Error)]
 pub enum ObserveError {

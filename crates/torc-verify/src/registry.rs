@@ -1,5 +1,7 @@
 //! Obligation registry: collects, tracks, and updates proof obligations.
 
+use std::collections::HashMap;
+
 use torc_core::contract::{ObligationKind, ProofObligation, ProofStatus, ProofWitness, Waiver};
 use torc_core::graph::edge::EdgeId;
 use torc_core::graph::node::NodeId;
@@ -32,6 +34,8 @@ pub struct RegistryStats {
 #[derive(Debug, Clone)]
 pub struct ObligationRegistry {
     obligations: Vec<TrackedObligation>,
+    /// Index mapping obligation ID → position in the `obligations` Vec for O(1) lookup.
+    id_index: HashMap<u64, usize>,
     next_id: u64,
 }
 
@@ -40,6 +44,7 @@ impl ObligationRegistry {
     pub fn new() -> Self {
         Self {
             obligations: Vec::new(),
+            id_index: HashMap::new(),
             next_id: 0,
         }
     }
@@ -78,12 +83,14 @@ impl ObligationRegistry {
     ) {
         let id = self.next_id;
         self.next_id += 1;
+        let pos = self.obligations.len();
         self.obligations.push(TrackedObligation {
             id,
             obligation,
             node_id,
             edge_id,
         });
+        self.id_index.insert(id, pos);
     }
 
     /// Iterate over all obligations.
@@ -105,9 +112,15 @@ impl ObligationRegistry {
             .filter(move |o| o.obligation.kind == kind)
     }
 
+    /// Look up an obligation by ID in O(1) time.
+    pub fn get(&self, id: u64) -> Option<&TrackedObligation> {
+        self.id_index.get(&id).map(|&pos| &self.obligations[pos])
+    }
+
     /// Update the status and optional witness of an obligation by ID.
     pub fn update_status(&mut self, id: u64, status: ProofStatus, witness: Option<ProofWitness>) {
-        if let Some(tracked) = self.obligations.iter_mut().find(|o| o.id == id) {
+        if let Some(&pos) = self.id_index.get(&id) {
+            let tracked = &mut self.obligations[pos];
             tracked.obligation.status = status;
             if witness.is_some() {
                 tracked.obligation.witness = witness;
@@ -117,7 +130,8 @@ impl ObligationRegistry {
 
     /// Apply a waiver to an obligation, setting its status to Waived.
     pub fn apply_waiver(&mut self, id: u64, waiver: Waiver) {
-        if let Some(tracked) = self.obligations.iter_mut().find(|o| o.id == id) {
+        if let Some(&pos) = self.id_index.get(&id) {
+            let tracked = &mut self.obligations[pos];
             tracked.obligation.status = ProofStatus::Waived;
             tracked.obligation.waiver = Some(waiver);
         }

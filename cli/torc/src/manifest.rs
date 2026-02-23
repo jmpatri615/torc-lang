@@ -251,8 +251,15 @@ pub fn resolve_target(name: &str, project_dir: Option<&Path>) -> Option<torc_tar
         _ => {}
     }
 
-    // 2. Custom .target.toml file
+    // 2. Custom .target.toml file (validate name to prevent path traversal)
     if let Some(dir) = project_dir {
+        if !name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        {
+            eprintln!("warning: invalid target name '{name}': must contain only alphanumerics, hyphens, and underscores");
+            return None;
+        }
         let target_path = dir.join("targets").join(format!("{name}.target.toml"));
         if target_path.exists() {
             match torc_targets::load_platform_toml(&target_path) {

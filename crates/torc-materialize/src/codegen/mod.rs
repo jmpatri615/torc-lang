@@ -25,8 +25,8 @@ use crate::schedule::ExecutionSchedule;
 
 use self::context::CodegenContext;
 use self::emit::{
-    emit_bitcode, emit_llvm_ir, emit_object, link_executable, platform_cpu, platform_triple,
-    resolve_paths,
+    emit_bitcode, emit_llvm_ir, emit_object, link_executable, platform_cpu, platform_features,
+    platform_triple, resolve_paths,
 };
 use self::profile::{to_llvm_opt_level, OptimizationProfile};
 use self::types::to_llvm_type;
@@ -105,6 +105,7 @@ pub fn emit_code(
     // Determine the platform triple
     let triple = platform_triple(&platform.name);
     let cpu = platform_cpu(&platform.name);
+    let features = platform_features(&platform.name, &platform.isa.extensions);
     let opt_level = to_llvm_opt_level(&config.optimization);
 
     // Build the function signature from the graph's root/leaf nodes
@@ -170,7 +171,14 @@ pub fn emit_code(
             })
         }
         EmitTarget::ObjectFile => {
-            let size = emit_object(cg_ctx.module(), triple, cpu, "", opt_level, &obj_path)?;
+            let size = emit_object(
+                cg_ctx.module(),
+                triple,
+                cpu,
+                &features,
+                opt_level,
+                &obj_path,
+            )?;
             Ok(CodegenOutput {
                 object_path: Some(obj_path),
                 executable_path: None,
@@ -179,8 +187,15 @@ pub fn emit_code(
             })
         }
         EmitTarget::Executable => {
-            let size = emit_object(cg_ctx.module(), triple, cpu, "", opt_level, &obj_path)?;
-            link_executable(&obj_path, &exe_path)?;
+            let size = emit_object(
+                cg_ctx.module(),
+                triple,
+                cpu,
+                &features,
+                opt_level,
+                &obj_path,
+            )?;
+            link_executable(&obj_path, &exe_path, &platform.name, &platform.environment)?;
             let exe_size = std::fs::metadata(&exe_path)
                 .map(|m| m.len())
                 .unwrap_or(size);
@@ -403,5 +418,89 @@ mod tests {
         let output = emit_code(&g, &schedule, &layout, &platform, &config).unwrap();
         let ir = output.llvm_ir.unwrap();
         assert!(ir.contains("ret i32 42"));
+    }
+
+    #[test]
+    fn emit_object_for_aarch64_graph() {
+        let graph = simple_arithmetic_graph();
+        let platform = Platform::generic_linux_aarch64();
+        let schedule = compute_schedule(&graph).unwrap();
+        let layout = estimate_layout(&graph, &platform).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+
+        let config = CodegenConfig {
+            target: EmitTarget::ObjectFile,
+            optimization: OptimizationProfile::Balanced,
+            output_dir: dir.path().to_path_buf(),
+            function_name: "test_aarch64".into(),
+        };
+
+        let output = emit_code(&graph, &schedule, &layout, &platform, &config).unwrap();
+        assert!(output.object_path.as_ref().unwrap().exists());
+        assert!(output.code_size_bytes > 0);
+    }
+
+    #[test]
+    fn emit_ir_for_aarch64_graph() {
+        let graph = simple_arithmetic_graph();
+        let platform = Platform::generic_linux_aarch64();
+        let schedule = compute_schedule(&graph).unwrap();
+        let layout = estimate_layout(&graph, &platform).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+
+        let config = CodegenConfig {
+            target: EmitTarget::LlvmIr,
+            optimization: OptimizationProfile::Debug,
+            output_dir: dir.path().to_path_buf(),
+            function_name: "test_aarch64_ir".into(),
+        };
+
+        let output = emit_code(&graph, &schedule, &layout, &platform, &config).unwrap();
+        let ir = output.llvm_ir.unwrap();
+        assert!(ir.contains("define"));
+        // LLVM may constant-fold `add i32 10, 32` into `ret i32 42`
+        assert!(ir.contains("add") || ir.contains("ret i32 42"));
+    }
+
+    #[test]
+    fn emit_object_for_stm32_graph() {
+        let graph = simple_arithmetic_graph();
+        let platform = Platform::stm32f407_discovery();
+        let schedule = compute_schedule(&graph).unwrap();
+        let layout = estimate_layout(&graph, &platform).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+
+        let config = CodegenConfig {
+            target: EmitTarget::ObjectFile,
+            optimization: OptimizationProfile::MinimalSize,
+            output_dir: dir.path().to_path_buf(),
+            function_name: "test_stm32".into(),
+        };
+
+        let output = emit_code(&graph, &schedule, &layout, &platform, &config).unwrap();
+        assert!(output.object_path.as_ref().unwrap().exists());
+        assert!(output.code_size_bytes > 0);
+    }
+
+    #[test]
+    fn emit_ir_for_stm32_graph() {
+        let graph = simple_arithmetic_graph();
+        let platform = Platform::stm32f407_discovery();
+        let schedule = compute_schedule(&graph).unwrap();
+        let layout = estimate_layout(&graph, &platform).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+
+        let config = CodegenConfig {
+            target: EmitTarget::LlvmIr,
+            optimization: OptimizationProfile::Debug,
+            output_dir: dir.path().to_path_buf(),
+            function_name: "test_stm32_ir".into(),
+        };
+
+        let output = emit_code(&graph, &schedule, &layout, &platform, &config).unwrap();
+        let ir = output.llvm_ir.unwrap();
+        assert!(ir.contains("define"));
+        // LLVM may constant-fold `add i32 10, 32` into `ret i32 42`
+        assert!(ir.contains("add") || ir.contains("ret i32 42"));
     }
 }

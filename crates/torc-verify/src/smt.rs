@@ -52,7 +52,7 @@ impl SmtSolver {
         let solver = z3::Solver::new(&ctx);
 
         // Set timeout in milliseconds
-        let timeout_ms = self.timeout.as_millis() as u32;
+        let timeout_ms = u32::try_from(self.timeout.as_millis()).unwrap_or(u32::MAX);
         let mut params = z3::Params::new(&ctx);
         params.set_u32("timeout", timeout_ms);
         solver.set_params(&params);
@@ -67,7 +67,9 @@ impl SmtSolver {
                 match solver.check() {
                     z3::SatResult::Unsat => SmtResult::Proven,
                     z3::SatResult::Sat => {
-                        let model = solver.get_model().unwrap();
+                        let model = solver
+                            .get_model()
+                            .expect("Z3 SAT result should provide model");
                         let counterexample = extract_model(&ctx, &model, &obligation.predicate);
                         SmtResult::Disproven { counterexample }
                     }
@@ -177,8 +179,15 @@ fn expr_to_z3_int<'ctx>(ctx: &'ctx z3::Context, expr: &Predicate) -> Option<z3::
     use z3::ast::Int;
 
     match expr {
-        Predicate::IntLit(n) => Some(Int::from_i64(ctx, *n as i64)),
-        Predicate::FloatLit(f) => Some(Int::from_i64(ctx, *f as i64)),
+        Predicate::IntLit(n) => Some(Int::from_i64(
+            ctx,
+            i64::try_from(*n).unwrap_or(if *n > 0 { i64::MAX } else { i64::MIN }),
+        )),
+        Predicate::FloatLit(f) => {
+            // Clamp to i64 range before truncating float → int
+            let clamped = f.clamp(i64::MIN as f64, i64::MAX as f64);
+            Some(Int::from_i64(ctx, clamped as i64))
+        }
         Predicate::Var(name) => Some(Int::new_const(ctx, name.as_str())),
         Predicate::Add(a, b) => {
             let l = expr_to_z3_int(ctx, a)?;

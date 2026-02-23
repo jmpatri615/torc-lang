@@ -3,6 +3,9 @@
 use thiserror::Error;
 use torc_core::graph::GraphError;
 
+/// Convenience alias for results within the materialize crate.
+pub type Result<T> = std::result::Result<T, MaterializationError>;
+
 /// Errors that can occur during the materialization pipeline.
 #[derive(Debug, Error)]
 pub enum MaterializationError {

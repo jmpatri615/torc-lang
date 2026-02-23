@@ -38,7 +38,7 @@ impl VerificationEngine {
         if self.profile.level != ProfileLevel::Certification {
             let ids_to_cache: Vec<u64> = registry.pending().map(|o| o.id).collect();
             for id in ids_to_cache {
-                if let Some(tracked) = registry.all().iter().find(|o| o.id == id) {
+                if let Some(tracked) = registry.get(id) {
                     if let Some(witness) = self.cache.lookup(&tracked.obligation) {
                         let w = witness.clone();
                         registry.update_status(id, ProofStatus::Verified, Some(w));
@@ -57,13 +57,12 @@ impl VerificationEngine {
         // 4. Interval analysis on remaining pending obligations
         if self.profile.run_interval {
             let pending: Vec<_> = registry.pending().collect();
-            let pending_refs: Vec<_> = pending.to_vec();
-            let results = IntervalAnalyzer::analyze(&pending_refs);
+            let results = IntervalAnalyzer::analyze(&pending);
 
             for (id, result) in results {
                 match result {
                     IntervalResult::Proven => {
-                        if let Some(tracked) = registry.all().iter().find(|o| o.id == id) {
+                        if let Some(tracked) = registry.get(id) {
                             let witness =
                                 generate_witness("interval_domain", &tracked.obligation, vec![]);
                             self.cache.store(&tracked.obligation, witness.clone());
@@ -85,7 +84,7 @@ impl VerificationEngine {
 
                 let pending_ids: Vec<u64> = registry.pending().map(|o| o.id).collect();
                 for id in pending_ids {
-                    if let Some(tracked) = registry.all().iter().find(|o| o.id == id) {
+                    if let Some(tracked) = registry.get(id) {
                         let result = solver.check_obligation(&tracked.obligation);
                         match result {
                             crate::smt::SmtResult::Proven => {
