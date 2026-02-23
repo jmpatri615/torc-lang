@@ -115,6 +115,29 @@ impl fmt::Display for MaterializationReport {
     }
 }
 
+impl MaterializationReport {
+    /// Format a compact spec-style report combining verification summary, resources, and artifact path.
+    pub fn format_spec_report(
+        &self,
+        verification_summary: &str,
+        artifact_path: Option<&str>,
+    ) -> String {
+        let mut out = String::new();
+        out.push_str(verification_summary);
+        out.push('\n');
+        if let Some(ref resources) = self.resources {
+            out.push_str(&resources.format_spec_style());
+            out.push('\n');
+        }
+        if let Some(path) = artifact_path {
+            out.push_str(&format!("Artifact: {path}"));
+            out.push('\n');
+        }
+        out.truncate(out.trim_end_matches('\n').len());
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -152,5 +175,59 @@ mod tests {
         assert!(output.contains("linux-x86_64"));
         assert!(output.contains("PASSED"));
         assert!(output.contains("2 deduplicated"));
+    }
+
+    #[test]
+    fn format_spec_report_full() {
+        use crate::resource::{ResourceReport, ResourceUsage};
+
+        let report = MaterializationReport {
+            target: "stm32f407-discovery".into(),
+            duration_ms: 15,
+            canonicalization: CanonicalizationStats {
+                nodes_deduplicated: 0,
+                regions_flattened: 0,
+                regions_inlined: 0,
+                initial_node_count: 18,
+                final_node_count: 18,
+            },
+            verification_passed: true,
+            transforms: vec![],
+            schedule_depth: 8,
+            max_parallelism: 2,
+            resources: Some(ResourceReport {
+                flash: ResourceUsage {
+                    name: "flash".into(),
+                    used: 31_244,
+                    available: 524_288,
+                    percent: 6.0,
+                },
+                ram: ResourceUsage {
+                    name: "ram".into(),
+                    used: 2_108,
+                    available: 131_072,
+                    percent: 1.6,
+                },
+                stack: Some(ResourceUsage {
+                    name: "stack".into(),
+                    used: 892,
+                    available: 4_096,
+                    percent: 21.8,
+                }),
+                all_fit: true,
+                violations: vec![],
+            }),
+            codegen_enabled: false,
+            code_size_bytes: None,
+            optimization_profile: None,
+            post_verify_passed: None,
+        };
+
+        let verify_summary = "Verification: 42/42 obligations verified (0 waived)";
+        let output = report.format_spec_report(verify_summary, Some("/tmp/out/main.elf"));
+        assert!(output.contains("Verification: 42/42"));
+        assert!(output.contains("Resources:"));
+        assert!(output.contains("Flash:"));
+        assert!(output.contains("Artifact: /tmp/out/main.elf"));
     }
 }

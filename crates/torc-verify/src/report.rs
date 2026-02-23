@@ -152,6 +152,14 @@ impl VerificationReport {
             profile,
         }
     }
+
+    /// Format a compact spec-style summary line (spec section 12).
+    pub fn format_spec_summary(&self) -> String {
+        format!(
+            "Verification: {}/{} obligations verified ({} waived)",
+            self.summary.verified, self.summary.total, self.summary.waived,
+        )
+    }
 }
 
 /// Generate suggestions based on obligation kind.
@@ -286,6 +294,26 @@ mod tests {
         let output = format!("{report}");
         assert!(output.contains("Verification Report"));
         assert!(output.contains("Total:"));
+    }
+
+    #[test]
+    fn spec_summary_format() {
+        let report = VerificationReport {
+            summary: ReportSummary {
+                total: 42,
+                verified: 42,
+                pending: 0,
+                waived: 0,
+                failed: 0,
+                cache_hits: 10,
+            },
+            diagnostics: vec![],
+            profile: ProfileLevel::Development,
+        };
+        assert_eq!(
+            report.format_spec_summary(),
+            "Verification: 42/42 obligations verified (0 waived)"
+        );
     }
 
     #[test]

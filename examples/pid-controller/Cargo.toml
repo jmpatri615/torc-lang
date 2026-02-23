@@ -1,16 +1,16 @@
 [package]
-name = "foc-controller"
+name = "pid-controller"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
 
 [lib]
-name = "foc_controller"
+name = "pid_controller"
 path = "src/lib.rs"
 
 [[bin]]
-name = "foc-controller"
+name = "pid-controller"
 path = "src/main.rs"
 
 [dependencies]
@@ -23,3 +23,7 @@ torc-observe = { workspace = true }
 torc-targets = { workspace = true }
 torc-materialize = { workspace = true }
 tempfile = { workspace = true }
+
+[features]
+default = []
+llvm = ["torc-materialize/llvm"]

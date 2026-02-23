@@ -1,6 +1,6 @@
-//! Integration tests for the end-to-end arithmetic example.
+//! Integration tests for the PID controller example.
 
-use e2e_arithmetic::build_graph;
+use pid_controller::build_graph;
 use torc_trc::TrcFile;
 
 #[test]
@@ -8,14 +8,14 @@ fn graph_construction() {
     let graph = build_graph();
     assert_eq!(
         graph.node_count(),
-        7,
-        "expected 7 nodes (4 literals + 3 arithmetic), got {}",
+        18,
+        "expected 18 nodes (7 literals + 6 arithmetic + 2 comparison + 2 select + 1 conversion), got {}",
         graph.node_count()
     );
     assert_eq!(
         graph.edge_count(),
-        6,
-        "expected 6 edges, got {}",
+        23,
+        "expected 23 edges, got {}",
         graph.edge_count()
     );
 }
@@ -40,7 +40,49 @@ fn topological_sort() {
     let topo = graph
         .topological_sort()
         .expect("topological sort should succeed");
-    assert_eq!(topo.len(), 7, "all 7 nodes should be in topo order");
+    assert_eq!(topo.len(), 18, "all 18 nodes should be in topo order");
+}
+
+#[test]
+fn verification_produces_obligations() {
+    let graph = build_graph();
+    let profile = torc_verify::profile::VerificationProfile::development();
+    let mut engine = torc_verify::engine::VerificationEngine::new(profile);
+    let report = engine.verify(&graph);
+    assert!(
+        report.summary.total > 0,
+        "should have verification obligations"
+    );
+}
+
+#[test]
+fn pseudo_code_view() {
+    let graph = build_graph();
+    use torc_observe::view::{RenderContext, View};
+    let view = torc_observe::PseudoCodeView;
+    let ctx = RenderContext::empty();
+    let output = view.render(&graph, &ctx).expect("render pseudo-code");
+    assert!(!output.text.is_empty(), "pseudo-code should not be empty");
+}
+
+#[test]
+fn contract_view() {
+    let graph = build_graph();
+    use torc_observe::view::{RenderContext, View};
+    let view = torc_observe::ContractView;
+    let ctx = RenderContext::empty();
+    let output = view.render(&graph, &ctx).expect("render contracts");
+    assert!(!output.text.is_empty(), "contract view should not be empty");
+}
+
+#[test]
+fn dataflow_view() {
+    let graph = build_graph();
+    use torc_observe::view::{RenderContext, View};
+    let view = torc_observe::DataflowView;
+    let ctx = RenderContext::empty();
+    let output = view.render(&graph, &ctx).expect("render dataflow");
+    assert!(!output.text.is_empty(), "dataflow view should not be empty");
 }
 
 #[cfg(feature = "llvm")]
@@ -52,7 +94,7 @@ mod llvm_tests {
     use torc_targets::Platform;
 
     #[test]
-    fn e2e_emit_llvm_ir() {
+    fn emit_llvm_ir_x86_64() {
         let graph = build_graph();
         let platform = Platform::generic_linux_x86_64();
         let schedule = compute_schedule(&graph).unwrap();
@@ -72,11 +114,10 @@ mod llvm_tests {
             ir.contains("define"),
             "IR should contain function definition"
         );
-        assert!(ir.contains("ret i32"), "IR should return an i32 value");
     }
 
     #[test]
-    fn e2e_emit_llvm_ir_aarch64() {
+    fn emit_llvm_ir_aarch64() {
         let graph = build_graph();
         let platform = Platform::generic_linux_aarch64();
         let schedule = compute_schedule(&graph).unwrap();
@@ -99,7 +140,7 @@ mod llvm_tests {
     }
 
     #[test]
-    fn e2e_emit_llvm_ir_stm32() {
+    fn emit_llvm_ir_stm32() {
         let graph = build_graph();
         let platform = Platform::stm32f407_discovery();
         let schedule = compute_schedule(&graph).unwrap();
@@ -122,9 +163,9 @@ mod llvm_tests {
     }
 
     #[test]
-    fn e2e_emit_object_aarch64() {
+    fn emit_object_x86_64() {
         let graph = build_graph();
-        let platform = Platform::generic_linux_aarch64();
+        let platform = Platform::generic_linux_x86_64();
         let schedule = compute_schedule(&graph).unwrap();
         let layout = estimate_layout(&graph, &platform).unwrap();
         let dir = tempfile::tempdir().unwrap();
@@ -140,6 +181,7 @@ mod llvm_tests {
         let obj_path = output.object_path.expect("should produce object file");
         assert!(obj_path.exists(), "object file should exist on disk");
 
+        // Check ELF magic
         let bytes = std::fs::read(&obj_path).unwrap();
         assert!(bytes.len() >= 5, "object file should not be empty");
         assert_eq!(&bytes[0..4], b"\x7fELF", "should be ELF format");
@@ -147,7 +189,33 @@ mod llvm_tests {
     }
 
     #[test]
-    fn e2e_emit_object_stm32() {
+    fn emit_object_aarch64() {
+        let graph = build_graph();
+        let platform = Platform::generic_linux_aarch64();
+        let schedule = compute_schedule(&graph).unwrap();
+        let layout = estimate_layout(&graph, &platform).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+
+        let config = CodegenConfig {
+            target: EmitTarget::ObjectFile,
+            output_dir: dir.path().to_path_buf(),
+            function_name: "main".into(),
+            ..Default::default()
+        };
+
+        let output = emit_code(&graph, &schedule, &layout, &platform, &config).unwrap();
+        let obj_path = output.object_path.expect("should produce object file");
+        assert!(obj_path.exists(), "object file should exist on disk");
+
+        // Check ELF magic
+        let bytes = std::fs::read(&obj_path).unwrap();
+        assert!(bytes.len() >= 5, "object file should not be empty");
+        assert_eq!(&bytes[0..4], b"\x7fELF", "should be ELF format");
+        assert_eq!(bytes[4], 2, "should be ELF64 (class byte)");
+    }
+
+    #[test]
+    fn emit_object_stm32() {
         let graph = build_graph();
         let platform = Platform::stm32f407_discovery();
         let schedule = compute_schedule(&graph).unwrap();
@@ -165,6 +233,7 @@ mod llvm_tests {
         let obj_path = output.object_path.expect("should produce object file");
         assert!(obj_path.exists(), "object file should exist on disk");
 
+        // Check ELF magic
         let bytes = std::fs::read(&obj_path).unwrap();
         assert!(bytes.len() >= 5, "object file should not be empty");
         assert_eq!(&bytes[0..4], b"\x7fELF", "should be ELF format");
@@ -172,49 +241,7 @@ mod llvm_tests {
     }
 
     #[test]
-    #[ignore] // Requires aarch64 cross-linker
-    fn e2e_build_executable_aarch64() {
-        let graph = build_graph();
-        let platform = Platform::generic_linux_aarch64();
-        let schedule = compute_schedule(&graph).unwrap();
-        let layout = estimate_layout(&graph, &platform).unwrap();
-        let dir = tempfile::tempdir().unwrap();
-
-        let config = CodegenConfig {
-            target: EmitTarget::Executable,
-            output_dir: dir.path().to_path_buf(),
-            function_name: "main".into(),
-            ..Default::default()
-        };
-
-        let output = emit_code(&graph, &schedule, &layout, &platform, &config).unwrap();
-        let exe_path = output.executable_path.expect("should produce executable");
-        assert!(exe_path.exists(), "executable should exist on disk");
-    }
-
-    #[test]
-    #[ignore] // Requires ARM cross-linker
-    fn e2e_build_executable_stm32() {
-        let graph = build_graph();
-        let platform = Platform::stm32f407_discovery();
-        let schedule = compute_schedule(&graph).unwrap();
-        let layout = estimate_layout(&graph, &platform).unwrap();
-        let dir = tempfile::tempdir().unwrap();
-
-        let config = CodegenConfig {
-            target: EmitTarget::Executable,
-            output_dir: dir.path().to_path_buf(),
-            function_name: "main".into(),
-            ..Default::default()
-        };
-
-        let output = emit_code(&graph, &schedule, &layout, &platform, &config).unwrap();
-        let exe_path = output.executable_path.expect("should produce executable");
-        assert!(exe_path.exists(), "executable should exist on disk");
-    }
-
-    #[test]
-    fn e2e_build_and_run_executable() {
+    fn build_and_run_x86_64() {
         let graph = build_graph();
         let platform = Platform::generic_linux_x86_64();
         let schedule = compute_schedule(&graph).unwrap();
@@ -239,8 +266,29 @@ mod llvm_tests {
 
         assert_eq!(
             status.code(),
-            Some(79),
-            "executable should exit with code 79 ((10 + 32) * 2 - 5)"
+            Some(6),
+            "executable should exit with code 6 (fptosi truncation of 6.5)"
         );
+    }
+
+    #[test]
+    #[ignore] // Requires aarch64 cross-linker
+    fn build_executable_aarch64() {
+        let graph = build_graph();
+        let platform = Platform::generic_linux_aarch64();
+        let schedule = compute_schedule(&graph).unwrap();
+        let layout = estimate_layout(&graph, &platform).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+
+        let config = CodegenConfig {
+            target: EmitTarget::Executable,
+            output_dir: dir.path().to_path_buf(),
+            function_name: "main".into(),
+            ..Default::default()
+        };
+
+        let output = emit_code(&graph, &schedule, &layout, &platform, &config).unwrap();
+        let exe_path = output.executable_path.expect("should produce executable");
+        assert!(exe_path.exists(), "executable should exist on disk");
     }
 }

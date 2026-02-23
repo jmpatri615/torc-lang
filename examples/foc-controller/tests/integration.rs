@@ -113,3 +113,68 @@ fn foc_topological_sort() {
     let topo = graph.topological_sort().expect("topological sort");
     assert_eq!(topo.len(), 74, "all 74 nodes in topo order");
 }
+
+#[test]
+fn foc_resource_report_stm32() {
+    let graph = build_graph();
+    let platform = torc_targets::Platform::stm32f407_discovery();
+
+    // Verification
+    let profile = VerificationProfile::development();
+    let mut engine = VerificationEngine::new(profile);
+    let verify_report = engine.verify(&graph);
+
+    // Schedule + layout + resource fit
+    let schedule = torc_materialize::compute_schedule(&graph).unwrap();
+    let layout = torc_materialize::estimate_layout(&graph, &platform).unwrap();
+    let resource_report = torc_materialize::check_resource_fit(&layout, &platform);
+
+    // FOC should fit STM32F407 (1 MB flash, 192 KB RAM)
+    assert!(
+        resource_report.all_fit,
+        "FOC graph should fit STM32F407: {:?}",
+        resource_report.violations
+    );
+    assert!(resource_report.flash.percent < 100.0);
+    assert!(resource_report.ram.percent < 100.0);
+
+    // Print spec-style report
+    let spec_summary = verify_report.format_spec_summary();
+    let spec_resources = resource_report.format_spec_style();
+    assert!(spec_summary.contains("Verification:"));
+    assert!(spec_resources.contains("Resources:"));
+    assert!(schedule.sequential_depth > 0);
+
+    println!("{spec_summary}");
+    println!("{spec_resources}");
+}
+
+#[test]
+fn foc_full_pipeline_stm32_no_codegen() {
+    // Run pipeline stages individually on the FOC graph for STM32.
+    // The FOC graph has complex region topology that canonicalization may
+    // restructure, so we run each stage on the original graph to validate
+    // that verification, scheduling, layout, and resource fitting all work.
+    let graph = build_graph();
+    let platform = torc_targets::Platform::stm32f407_discovery();
+
+    // Verification gate
+    let gate_config = torc_materialize::GateConfig::development();
+    torc_materialize::gate_or_halt(&graph, &gate_config).expect("verification gate should pass");
+
+    // Schedule
+    let schedule = torc_materialize::compute_schedule(&graph).expect("scheduling should succeed");
+    assert!(
+        schedule.sequential_depth > 0,
+        "schedule depth should be > 0"
+    );
+
+    // Layout + resource fit
+    let layout = torc_materialize::estimate_layout(&graph, &platform)
+        .expect("layout estimation should succeed");
+    let resource_report = torc_materialize::check_resource_fit(&layout, &platform);
+    torc_materialize::require_fit(&resource_report).expect("resources should fit STM32F407");
+
+    assert!(resource_report.all_fit);
+    assert_eq!(graph.node_count(), 74);
+}
