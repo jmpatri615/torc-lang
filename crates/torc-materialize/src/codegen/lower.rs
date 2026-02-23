@@ -619,7 +619,7 @@ mod tests {
 
     /// Helper: create a codegen context with a function and entry block.
     fn setup_ctx(context: &Context) -> CodegenContext<'_> {
-        let mut cg = CodegenContext::new(context, "test");
+        let cg = CodegenContext::new(context, "test");
         let fn_type = context.i32_type().fn_type(&[], false);
         let function = cg.module().add_function("test_fn", fn_type, None);
         let entry = context.append_basic_block(function, "entry");

@@ -139,7 +139,7 @@ fn approx_type_bits(ty: &BasicTypeEnum<'_>) -> u32 {
 mod tests {
     use super::*;
     use std::collections::BTreeMap;
-    use torc_core::types::{Linearity, Predicate, Signedness};
+    use torc_core::types::{Linearity, Predicate};
 
     #[test]
     fn primitive_types() {

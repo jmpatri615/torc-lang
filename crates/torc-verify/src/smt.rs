@@ -53,12 +53,13 @@ impl SmtSolver {
 
         // Set timeout in milliseconds
         let timeout_ms = self.timeout.as_millis() as u32;
-        let params = z3::Params::new(&ctx);
+        let mut params = z3::Params::new(&ctx);
         params.set_u32("timeout", timeout_ms);
         solver.set_params(&params);
 
-        // Translate predicate to Z3 AST, then negate and check
-        match predicate_to_z3(&ctx, &obligation.predicate) {
+        // Translate predicate to Z3 AST, then negate and check.
+        // Bind the result so that Z3 temporaries are dropped before `ctx`.
+        let result = match predicate_to_z3(&ctx, &obligation.predicate) {
             Some(ast) => {
                 let negated = ast.not();
                 solver.assert(&negated);
@@ -67,7 +68,7 @@ impl SmtSolver {
                     z3::SatResult::Unsat => SmtResult::Proven,
                     z3::SatResult::Sat => {
                         let model = solver.get_model().unwrap();
-                        let counterexample = extract_model(&model, &obligation.predicate);
+                        let counterexample = extract_model(&ctx, &model, &obligation.predicate);
                         SmtResult::Disproven { counterexample }
                     }
                     z3::SatResult::Unknown => {
@@ -85,7 +86,8 @@ impl SmtSolver {
             None => SmtResult::Unknown {
                 reason: "unsupported predicate structure".into(),
             },
-        }
+        };
+        result
     }
 }
 
@@ -213,19 +215,20 @@ fn expr_to_z3_int<'ctx>(ctx: &'ctx z3::Context, expr: &Predicate) -> Option<z3::
 
 /// Extract variable assignments from a Z3 model as a counterexample.
 #[cfg(feature = "z3")]
-fn extract_model(model: &z3::Model, predicate: &Predicate) -> HashMap<String, String> {
+fn extract_model(
+    ctx: &z3::Context,
+    model: &z3::Model,
+    predicate: &Predicate,
+) -> HashMap<String, String> {
     let mut vars = Vec::new();
     collect_vars(predicate, &mut vars);
 
     let mut result = HashMap::new();
-    for var_name in vars {
-        // Try to evaluate the variable in the model
-        for decl in model.get_const_decls() {
-            if decl.name() == var_name {
-                if let Some(val) = model.get_const_interp(&decl) {
-                    result.insert(var_name.clone(), val.to_string());
-                }
-            }
+    for var_name in &vars {
+        // Evaluate the variable in the model
+        let ast = z3::ast::Int::new_const(ctx, var_name.as_str());
+        if let Some(val) = model.eval(&ast, true) {
+            result.insert(var_name.clone(), val.to_string());
         }
     }
     result
