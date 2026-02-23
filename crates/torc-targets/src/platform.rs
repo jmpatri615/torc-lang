@@ -104,6 +104,19 @@ impl Platform {
         p
     }
 
+    /// Construct a generic Linux AArch64 platform.
+    pub fn generic_linux_aarch64() -> Self {
+        let mut p = Self::compose(
+            "linux-aarch64",
+            "generic",
+            IsaModel::aarch64(),
+            MicroarchModel::generic_aarch64(),
+            EnvironmentModel::linux_aarch64(),
+        );
+        p.clock_hz = Some(2_400_000_000); // 2.4 GHz nominal
+        p
+    }
+
     /// Construct an STM32F407 Discovery board platform.
     pub fn stm32f407_discovery() -> Self {
         let mut p = Self::compose(
@@ -127,6 +140,18 @@ mod tests {
         let p = Platform::generic_linux_x86_64();
         assert_eq!(p.word_size_bytes(), 8);
         assert_eq!(p.clock_hz, Some(3_000_000_000));
+        let rc = p.resource_constraints();
+        assert!(rc.flash_bytes > 0);
+        assert!(rc.ram_bytes > 0);
+        assert!(rc.max_stack_bytes.is_some());
+    }
+
+    #[test]
+    fn linux_aarch64_platform() {
+        let p = Platform::generic_linux_aarch64();
+        assert_eq!(p.word_size_bytes(), 8);
+        assert_eq!(p.clock_hz, Some(2_400_000_000));
+        assert_eq!(p.name, "linux-aarch64");
         let rc = p.resource_constraints();
         assert!(rc.flash_bytes > 0);
         assert!(rc.ram_bytes > 0);

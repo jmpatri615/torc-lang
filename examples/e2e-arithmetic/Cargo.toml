@@ -1,0 +1,29 @@
+[package]
+name = "e2e-arithmetic"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "e2e_arithmetic"
+path = "src/lib.rs"
+
+[[bin]]
+name = "e2e-arithmetic"
+path = "src/main.rs"
+
+[dependencies]
+torc-core = { workspace = true }
+torc-trc = { workspace = true }
+
+[dev-dependencies]
+torc-verify = { workspace = true }
+torc-observe = { workspace = true }
+torc-targets = { workspace = true }
+torc-materialize = { workspace = true }
+tempfile = { workspace = true }
+
+[features]
+default = []
+llvm = ["torc-materialize/llvm"]

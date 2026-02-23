@@ -125,6 +125,57 @@ impl IsaModel {
         }
     }
 
+    /// Construct a model for AArch64 (ARMv8-A, 64-bit).
+    pub fn aarch64() -> Self {
+        Self {
+            name: "AArch64".into(),
+            version: "v8-A".into(),
+            endianness: Endianness::Little,
+            word_size: 64,
+            address_space: 64,
+            register_classes: vec![
+                RegisterClass {
+                    name: "gpr".into(),
+                    count: 31,
+                    width_bits: 64,
+                },
+                RegisterClass {
+                    name: "fpr".into(),
+                    count: 32,
+                    width_bits: 128,
+                },
+            ],
+            calling_conventions: vec![CallingConvention {
+                name: "AAPCS64".into(),
+                argument_registers: vec![
+                    "x0".into(),
+                    "x1".into(),
+                    "x2".into(),
+                    "x3".into(),
+                    "x4".into(),
+                    "x5".into(),
+                    "x6".into(),
+                    "x7".into(),
+                ],
+                return_registers: vec!["x0".into(), "x1".into()],
+                callee_saved: vec![
+                    "x19".into(),
+                    "x20".into(),
+                    "x21".into(),
+                    "x22".into(),
+                    "x23".into(),
+                    "x24".into(),
+                    "x25".into(),
+                    "x26".into(),
+                    "x27".into(),
+                    "x28".into(),
+                ],
+                stack_alignment: 16,
+            }],
+            extensions: vec!["NEON".into(), "FP".into()],
+        }
+    }
+
     /// Construct a model for ARMv7-M (Cortex-M class).
     pub fn armv7m() -> Self {
         Self {
@@ -178,6 +229,16 @@ mod tests {
         assert_eq!(isa.gp_register_count(), 16);
         assert!(isa.calling_convention("System V AMD64").is_some());
         assert!(isa.calling_convention("nonexistent").is_none());
+    }
+
+    #[test]
+    fn aarch64_defaults() {
+        let isa = IsaModel::aarch64();
+        assert_eq!(isa.word_size, 64);
+        assert_eq!(isa.endianness, Endianness::Little);
+        assert_eq!(isa.gp_register_count(), 31);
+        assert!(isa.calling_convention("AAPCS64").is_some());
+        assert_eq!(isa.extensions, vec!["NEON", "FP"]);
     }
 
     #[test]

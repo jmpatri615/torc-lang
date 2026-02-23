@@ -104,6 +104,7 @@ pub fn link_executable(object_path: &Path, output_path: &Path) -> Result<(), Mat
 pub fn platform_triple(platform_name: &str) -> &str {
     match platform_name {
         "generic-linux-x86_64" | "linux-x86_64" => "x86_64-unknown-linux-gnu",
+        "linux-aarch64" => "aarch64-unknown-linux-gnu",
         _ => "x86_64-unknown-linux-gnu", // default fallback for Pass 2
     }
 }
@@ -112,6 +113,7 @@ pub fn platform_triple(platform_name: &str) -> &str {
 pub fn platform_cpu(platform_name: &str) -> &str {
     match platform_name {
         "generic-linux-x86_64" | "linux-x86_64" => "generic",
+        "linux-aarch64" => "generic",
         _ => "generic",
     }
 }
@@ -207,6 +209,10 @@ mod tests {
             "x86_64-unknown-linux-gnu"
         );
         assert_eq!(platform_triple("linux-x86_64"), "x86_64-unknown-linux-gnu");
+        assert_eq!(
+            platform_triple("linux-aarch64"),
+            "aarch64-unknown-linux-gnu"
+        );
     }
 
     #[test]

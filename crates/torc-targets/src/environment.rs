@@ -141,6 +141,47 @@ impl EnvironmentModel {
         }
     }
 
+    /// Construct a Linux AArch64 environment model.
+    pub fn linux_aarch64() -> Self {
+        Self {
+            name: "linux-aarch64".into(),
+            version: "generic".into(),
+            env_type: EnvironmentType::Linux,
+            has_os: true,
+            has_heap: true,
+            has_mmu: true,
+            memory_regions: vec![
+                MemoryRegion {
+                    name: "text".into(),
+                    base_address: 0x0040_0000,
+                    size_bytes: 256 * 1024 * 1024, // 256 MiB
+                    readable: true,
+                    writable: false,
+                    executable: true,
+                },
+                MemoryRegion {
+                    name: "heap".into(),
+                    base_address: 0x4000_0000,
+                    size_bytes: 4 * 1024 * 1024 * 1024, // 4 GiB
+                    readable: true,
+                    writable: true,
+                    executable: false,
+                },
+                MemoryRegion {
+                    name: "stack".into(),
+                    base_address: 0x7FFF_0000_0000,
+                    size_bytes: 8 * 1024 * 1024, // 8 MiB default
+                    readable: true,
+                    writable: true,
+                    executable: false,
+                },
+            ],
+            abi_name: "GNU".into(),
+            calling_convention: "AAPCS64".into(),
+            binary_format: BinaryFormat::Elf64,
+        }
+    }
+
     /// Construct a bare-metal ARM environment model (e.g., STM32).
     pub fn bare_metal_arm() -> Self {
         Self {
@@ -195,6 +236,20 @@ mod tests {
         assert!(env.has_mmu);
         assert!(env.memory_region("text").is_some());
         assert!(env.memory_region("nonexistent").is_none());
+        assert!(env.total_flash() > 0);
+        assert!(env.total_ram() > 0);
+    }
+
+    #[test]
+    fn linux_aarch64_environment() {
+        let env = EnvironmentModel::linux_aarch64();
+        assert!(env.has_os);
+        assert!(env.has_heap);
+        assert!(env.has_mmu);
+        assert_eq!(env.abi_name, "GNU");
+        assert_eq!(env.calling_convention, "AAPCS64");
+        assert_eq!(env.binary_format, BinaryFormat::Elf64);
+        assert!(env.memory_region("text").is_some());
         assert!(env.total_flash() > 0);
         assert!(env.total_ram() > 0);
     }

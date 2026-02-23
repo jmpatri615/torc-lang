@@ -247,6 +247,7 @@ pub fn resolve_target(name: &str, project_dir: Option<&Path>) -> Option<torc_tar
     match name {
         "linux-x86_64" => return Some(torc_targets::Platform::generic_linux_x86_64()),
         "stm32f407-discovery" => return Some(torc_targets::Platform::stm32f407_discovery()),
+        "linux-aarch64" => return Some(torc_targets::Platform::generic_linux_aarch64()),
         _ => {}
     }
 
@@ -274,6 +275,7 @@ pub fn builtin_targets() -> Vec<(&'static str, &'static str)> {
             "stm32f407-discovery",
             "STM32F407 Discovery (ARM Cortex-M4F, 168 MHz)",
         ),
+        ("linux-aarch64", "Generic Linux AArch64 (2.4 GHz, 256 MB)"),
     ]
 }
 
@@ -372,6 +374,7 @@ enforce_resources = true
     fn resolve_builtin_targets() {
         assert!(resolve_target("linux-x86_64", None).is_some());
         assert!(resolve_target("stm32f407-discovery", None).is_some());
+        assert!(resolve_target("linux-aarch64", None).is_some());
         assert!(resolve_target("nonexistent", None).is_none());
     }
 

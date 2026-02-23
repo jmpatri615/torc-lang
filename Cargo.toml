@@ -13,6 +13,7 @@ members = [
     "cli/torc",
     "examples/foc-controller",
     "examples/checksum",
+    "examples/e2e-arithmetic",
 ]
 
 [workspace.package]

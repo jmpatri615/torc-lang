@@ -71,6 +71,27 @@ impl MicroarchModel {
         }
     }
 
+    /// Construct a generic AArch64 microarchitecture model.
+    pub fn generic_aarch64() -> Self {
+        Self {
+            name: "generic-aarch64".into(),
+            version: "1.0".into(),
+            isa_ref: "AArch64".into(),
+            extensions: vec![],
+            pipeline: PipelineModel {
+                stages: 11,
+                branch_penalty_cycles: 13,
+                load_use_penalty_cycles: 4,
+            },
+            memory_timing: MemoryTiming {
+                bus_width_bits: 64,
+                flash_wait_states: None,
+                sram_wait_states: 0,
+            },
+            deterministic_timing: false,
+        }
+    }
+
     /// Construct a Cortex-M4 microarchitecture model.
     pub fn cortex_m4() -> Self {
         Self {
@@ -103,6 +124,15 @@ mod tests {
         assert_eq!(uarch.pipeline.stages, 14);
         assert!(!uarch.deterministic_timing);
         assert!(uarch.memory_timing.flash_wait_states.is_none());
+    }
+
+    #[test]
+    fn generic_aarch64_defaults() {
+        let uarch = MicroarchModel::generic_aarch64();
+        assert_eq!(uarch.pipeline.stages, 11);
+        assert!(!uarch.deterministic_timing);
+        assert!(uarch.memory_timing.flash_wait_states.is_none());
+        assert_eq!(uarch.isa_ref, "AArch64");
     }
 
     #[test]
