@@ -136,14 +136,9 @@ impl DecisionGraph {
         let from_state = decision.state;
         let from_value = decision.value.clone();
 
-        let mut transition = StateTransition::new(
-            id,
-            from_state,
-            to_state,
-            from_value,
-            new_value.clone(),
-        )
-        .with_sequence(self.next_sequence);
+        let mut transition =
+            StateTransition::new(id, from_state, to_state, from_value, new_value.clone())
+                .with_sequence(self.next_sequence);
         self.next_sequence += 1;
 
         if let Some(r) = rationale {
@@ -511,7 +506,12 @@ mod tests {
 
         // Unexplored -> Exploring
         graph
-            .transition(id, DecisionState::Exploring, DecisionValue::Unresolved, None)
+            .transition(
+                id,
+                DecisionState::Exploring,
+                DecisionValue::Unresolved,
+                None,
+            )
             .unwrap();
 
         // Exploring -> Tentative

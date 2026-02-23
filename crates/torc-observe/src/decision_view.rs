@@ -115,18 +115,42 @@ fn render_table(dg: &DecisionGraph, text: &mut String) {
     // Header
     text.push_str(&format!(
         "┌{:─<iw$}┬{:─<sw$}┬{:─<dw$}┬{:─<tw$}┬{:─<vw$}┐\n",
-        "", "", "", "", "",
-        iw = id_w + 2, sw = state_w + 2, dw = domain_w + 2, tw = title_w + 2, vw = value_w + 2,
+        "",
+        "",
+        "",
+        "",
+        "",
+        iw = id_w + 2,
+        sw = state_w + 2,
+        dw = domain_w + 2,
+        tw = title_w + 2,
+        vw = value_w + 2,
     ));
     text.push_str(&format!(
         "│ {:<iw$} │ {:<sw$} │ {:<dw$} │ {:<tw$} │ {:<vw$} │\n",
-        "ID", "State", "Domain", "Title", "Value",
-        iw = id_w, sw = state_w, dw = domain_w, tw = title_w, vw = value_w,
+        "ID",
+        "State",
+        "Domain",
+        "Title",
+        "Value",
+        iw = id_w,
+        sw = state_w,
+        dw = domain_w,
+        tw = title_w,
+        vw = value_w,
     ));
     text.push_str(&format!(
         "├{:─<iw$}┼{:─<sw$}┼{:─<dw$}┼{:─<tw$}┼{:─<vw$}┤\n",
-        "", "", "", "", "",
-        iw = id_w + 2, sw = state_w + 2, dw = domain_w + 2, tw = title_w + 2, vw = value_w + 2,
+        "",
+        "",
+        "",
+        "",
+        "",
+        iw = id_w + 2,
+        sw = state_w + 2,
+        dw = domain_w + 2,
+        tw = title_w + 2,
+        vw = value_w + 2,
     ));
 
     // Rows
@@ -135,16 +159,32 @@ fn render_table(dg: &DecisionGraph, text: &mut String) {
         let value_str = d.value.to_string();
         text.push_str(&format!(
             "│ {:<iw$} │ {:<sw$} │ {:<dw$} │ {:<tw$} │ {:<vw$} │\n",
-            id_short, d.state, d.domain, d.title, value_str,
-            iw = id_w, sw = state_w, dw = domain_w, tw = title_w, vw = value_w,
+            id_short,
+            d.state,
+            d.domain,
+            d.title,
+            value_str,
+            iw = id_w,
+            sw = state_w,
+            dw = domain_w,
+            tw = title_w,
+            vw = value_w,
         ));
     }
 
     // Footer
     text.push_str(&format!(
         "└{:─<iw$}┴{:─<sw$}┴{:─<dw$}┴{:─<tw$}┴{:─<vw$}┘\n",
-        "", "", "", "", "",
-        iw = id_w + 2, sw = state_w + 2, dw = domain_w + 2, tw = title_w + 2, vw = value_w + 2,
+        "",
+        "",
+        "",
+        "",
+        "",
+        iw = id_w + 2,
+        sw = state_w + 2,
+        dw = domain_w + 2,
+        tw = title_w + 2,
+        vw = value_w + 2,
     ));
     text.push('\n');
 }
@@ -162,12 +202,8 @@ fn render_assumptions(dg: &DecisionGraph, text: &mut String) {
 fn render_verification_impact(dg: &DecisionGraph, text: &mut String) {
     text.push_str("=== Verification Impact ===\n\n");
 
-    let has_conflicted = dg
-        .decisions()
-        .any(|d| d.state == DecisionState::Conflicted);
-    let has_tentative = dg
-        .decisions()
-        .any(|d| d.state == DecisionState::Tentative);
+    let has_conflicted = dg.decisions().any(|d| d.state == DecisionState::Conflicted);
+    let has_tentative = dg.decisions().any(|d| d.state == DecisionState::Tentative);
     let has_uncommitted = dg.decisions().any(|d| {
         matches!(
             d.state,
@@ -192,7 +228,9 @@ fn render_verification_impact(dg: &DecisionGraph, text: &mut String) {
         text.push_str("  → Verification profile bumped to at least INTEGRATION level.\n");
     } else if has_uncommitted {
         text.push_str("  Some decisions are not yet committed.\n");
-        text.push_str("  → Verification profile unchanged (deferred/unexplored decisions are safe).\n");
+        text.push_str(
+            "  → Verification profile unchanged (deferred/unexplored decisions are safe).\n",
+        );
     } else {
         text.push_str("  All decisions resolved — verification profile unchanged.\n");
     }
@@ -216,12 +254,8 @@ fn build_json(dg: &DecisionGraph) -> serde_json::Value {
         })
         .collect();
 
-    let has_conflicted = dg
-        .decisions()
-        .any(|d| d.state == DecisionState::Conflicted);
-    let has_tentative = dg
-        .decisions()
-        .any(|d| d.state == DecisionState::Tentative);
+    let has_conflicted = dg.decisions().any(|d| d.state == DecisionState::Conflicted);
+    let has_tentative = dg.decisions().any(|d| d.state == DecisionState::Tentative);
 
     let profile_effect = if has_conflicted {
         "certification"
@@ -328,7 +362,11 @@ mod tests {
     fn assumption_display() {
         let g = Graph::new();
         let mut dg = DecisionGraph::new();
-        let a = Assumption::new("Motor back-EMF stable", Confidence::Medium, ImpactLevel::High);
+        let a = Assumption::new(
+            "Motor back-EMF stable",
+            Confidence::Medium,
+            ImpactLevel::High,
+        );
         dg.add_assumption(a);
 
         let ctx = RenderContext {
@@ -367,7 +405,10 @@ mod tests {
         assert!(output.data["decisions"].is_array());
         assert!(output.data["assumptions"].is_object());
         assert!(output.data["verification_impact"].is_object());
-        assert_eq!(output.data["verification_impact"]["profile_effect"], "unchanged");
+        assert_eq!(
+            output.data["verification_impact"]["profile_effect"],
+            "unchanged"
+        );
         assert_eq!(output.data["verification_impact"]["build_blocked"], false);
     }
 
@@ -389,6 +430,9 @@ mod tests {
         assert!(output.text.contains("CONFLICTED"));
         assert!(output.text.contains("BLOCKED"));
         assert_eq!(output.data["verification_impact"]["build_blocked"], true);
-        assert_eq!(output.data["verification_impact"]["profile_effect"], "certification");
+        assert_eq!(
+            output.data["verification_impact"]["profile_effect"],
+            "certification"
+        );
     }
 }

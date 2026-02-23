@@ -27,9 +27,7 @@ pub fn generate_c_header(graph: &Graph, guard_name: &str) -> Result<String> {
     let mut out = String::new();
 
     // Header guard
-    let guard = guard_name
-        .to_uppercase()
-        .replace(['-', '.'], "_");
+    let guard = guard_name.to_uppercase().replace(['-', '.'], "_");
     out.push_str(&format!("#ifndef {guard}_H\n"));
     out.push_str(&format!("#define {guard}_H\n\n"));
 
@@ -235,11 +233,7 @@ mod tests {
     fn missing_export_annotation() {
         // Graph with no export annotations → empty header body
         let mut builder = GraphBuilder::new();
-        builder.add_typed_node(
-            NodeKind::Literal,
-            "lit",
-            TypeSignature::source(Type::i32()),
-        );
+        builder.add_typed_node(NodeKind::Literal, "lit", TypeSignature::source(Type::i32()));
         let graph = builder.into_graph();
         let header = generate_c_header(&graph, "empty").unwrap();
 

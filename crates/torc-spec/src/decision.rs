@@ -301,13 +301,34 @@ mod tests {
 
     #[test]
     fn verification_mode_mapping() {
-        assert_eq!(verification_mode(DecisionState::Committed), VerificationMode::Full);
-        assert_eq!(verification_mode(DecisionState::Tentative), VerificationMode::Conditional);
-        assert_eq!(verification_mode(DecisionState::Deferred), VerificationMode::Universal);
-        assert_eq!(verification_mode(DecisionState::Conflicted), VerificationMode::Halt);
-        assert_eq!(verification_mode(DecisionState::Unexplored), VerificationMode::Skip);
-        assert_eq!(verification_mode(DecisionState::Exploring), VerificationMode::Skip);
-        assert_eq!(verification_mode(DecisionState::Derived), VerificationMode::Full);
+        assert_eq!(
+            verification_mode(DecisionState::Committed),
+            VerificationMode::Full
+        );
+        assert_eq!(
+            verification_mode(DecisionState::Tentative),
+            VerificationMode::Conditional
+        );
+        assert_eq!(
+            verification_mode(DecisionState::Deferred),
+            VerificationMode::Universal
+        );
+        assert_eq!(
+            verification_mode(DecisionState::Conflicted),
+            VerificationMode::Halt
+        );
+        assert_eq!(
+            verification_mode(DecisionState::Unexplored),
+            VerificationMode::Skip
+        );
+        assert_eq!(
+            verification_mode(DecisionState::Exploring),
+            VerificationMode::Skip
+        );
+        assert_eq!(
+            verification_mode(DecisionState::Derived),
+            VerificationMode::Full
+        );
     }
 
     #[test]

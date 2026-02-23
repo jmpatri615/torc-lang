@@ -22,9 +22,11 @@ impl View for PseudoCodeView {
     }
 
     fn render(&self, graph: &Graph, _ctx: &RenderContext<'_>) -> Result<ViewOutput, ObserveError> {
-        let sorted = graph.topological_sort().map_err(|e| ObserveError::GraphError {
-            message: format!("topological sort failed: {e}"),
-        })?;
+        let sorted = graph
+            .topological_sort()
+            .map_err(|e| ObserveError::GraphError {
+                message: format!("topological sort failed: {e}"),
+            })?;
 
         if sorted.is_empty() {
             return Ok(ViewOutput {
@@ -59,7 +61,9 @@ impl View for PseudoCodeView {
         let mut lines = Vec::new();
         let mut json_stmts = Vec::new();
 
-        lines.push("// APPROXIMATION — actual execution follows graph data dependencies".to_string());
+        lines.push(
+            "// APPROXIMATION — actual execution follows graph data dependencies".to_string(),
+        );
         lines.push(String::new());
 
         for &node_id in &sorted {
@@ -149,8 +153,10 @@ impl View for PseudoCodeView {
 
                 NodeKind::Construct => {
                     // Collect all inputs
-                    let inputs: Vec<String> =
-                        (0..4).map(&input).take_while(|s| !s.starts_with("input_")).collect();
+                    let inputs: Vec<String> = (0..4)
+                        .map(&input)
+                        .take_while(|s| !s.starts_with("input_"))
+                        .collect();
                     format!("let {name} = construct({});", inputs.join(", "))
                 }
 
@@ -173,8 +179,10 @@ impl View for PseudoCodeView {
                 _ => {
                     // Generic fallback
                     let kind_name = format!("{}", node.kind);
-                    let inputs: Vec<String> =
-                        (0..4).map(input).take_while(|s| !s.starts_with("input_")).collect();
+                    let inputs: Vec<String> = (0..4)
+                        .map(input)
+                        .take_while(|s| !s.starts_with("input_"))
+                        .collect();
                     if inputs.is_empty() {
                         format!("let {name} = {kind_name}();")
                     } else {
@@ -253,8 +261,8 @@ mod tests {
     #[test]
     fn single_literal() {
         let mut g = Graph::new();
-        let mut n = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32()));
+        let mut n =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
         n.annotations.insert("name".into(), "x".into());
         n.annotations.insert("value".into(), "42".into());
         g.add_node(n).unwrap();
@@ -268,29 +276,29 @@ mod tests {
     #[test]
     fn linear_chain() {
         let mut g = Graph::new();
-        let mut n1 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32()));
+        let mut n1 =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
         n1.annotations.insert("name".into(), "a".into());
         n1.annotations.insert("value".into(), "10".into());
 
-        let mut n2 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32()));
+        let mut n2 =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
         n2.annotations.insert("name".into(), "b".into());
         n2.annotations.insert("value".into(), "20".into());
 
-        let mut n3 = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add))
-            .with_type_signature(TypeSignature::pure_fn(
-                vec![Type::i32(), Type::i32()],
-                Type::i32(),
-            ));
+        let mut n3 = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add)).with_type_signature(
+            TypeSignature::pure_fn(vec![Type::i32(), Type::i32()], Type::i32()),
+        );
         n3.annotations.insert("name".into(), "sum".into());
 
         let id1 = g.add_node(n1).unwrap();
         let id2 = g.add_node(n2).unwrap();
         let id3 = g.add_node(n3).unwrap();
 
-        g.add_edge(Edge::typed((id1, 0), (id3, 0), Type::i32())).unwrap();
-        g.add_edge(Edge::typed((id2, 0), (id3, 1), Type::i32())).unwrap();
+        g.add_edge(Edge::typed((id1, 0), (id3, 0), Type::i32()))
+            .unwrap();
+        g.add_edge(Edge::typed((id2, 0), (id3, 1), Type::i32()))
+            .unwrap();
 
         let view = PseudoCodeView;
         let output = view.render(&g, &empty_ctx()).unwrap();
@@ -326,29 +334,29 @@ mod tests {
     #[test]
     fn comparison_node() {
         let mut g = Graph::new();
-        let mut n1 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32()));
+        let mut n1 =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
         n1.annotations.insert("name".into(), "x".into());
         n1.annotations.insert("value".into(), "5".into());
 
-        let mut n2 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32()));
+        let mut n2 =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
         n2.annotations.insert("name".into(), "y".into());
         n2.annotations.insert("value".into(), "10".into());
 
-        let mut n3 = Node::new(NodeKind::Comparison(ComparisonOp::Lt))
-            .with_type_signature(TypeSignature::pure_fn(
-                vec![Type::i32(), Type::i32()],
-                Type::Bool,
-            ));
+        let mut n3 = Node::new(NodeKind::Comparison(ComparisonOp::Lt)).with_type_signature(
+            TypeSignature::pure_fn(vec![Type::i32(), Type::i32()], Type::Bool),
+        );
         n3.annotations.insert("name".into(), "less".into());
 
         let id1 = g.add_node(n1).unwrap();
         let id2 = g.add_node(n2).unwrap();
         let id3 = g.add_node(n3).unwrap();
 
-        g.add_edge(Edge::typed((id1, 0), (id3, 0), Type::i32())).unwrap();
-        g.add_edge(Edge::typed((id2, 0), (id3, 1), Type::i32())).unwrap();
+        g.add_edge(Edge::typed((id1, 0), (id3, 0), Type::i32()))
+            .unwrap();
+        g.add_edge(Edge::typed((id2, 0), (id3, 1), Type::i32()))
+            .unwrap();
 
         let view = PseudoCodeView;
         let output = view.render(&g, &empty_ctx()).unwrap();

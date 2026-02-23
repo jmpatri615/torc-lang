@@ -42,8 +42,10 @@ pub enum TrcError {
     #[error("file too small to be a valid TRC file")]
     FileTooSmall,
 
-    #[error("header count mismatch: expected {expected_nodes}n/{expected_edges}e/{expected_regions}r, \
-             got {actual_nodes}n/{actual_edges}e/{actual_regions}r")]
+    #[error(
+        "header count mismatch: expected {expected_nodes}n/{expected_edges}e/{expected_regions}r, \
+             got {actual_nodes}n/{actual_edges}e/{actual_regions}r"
+    )]
     CountMismatch {
         expected_nodes: usize,
         expected_edges: usize,
@@ -140,10 +142,11 @@ impl TrcFile {
             flags.set(TrcFlags::HAS_PROVENANCE);
         }
         // Check if any nodes have proof witnesses
-        if graph
-            .nodes()
-            .any(|n| n.contract.as_ref().is_some_and(|c| c.proof_witness.is_some()))
-        {
+        if graph.nodes().any(|n| {
+            n.contract
+                .as_ref()
+                .is_some_and(|c| c.proof_witness.is_some())
+        }) {
             flags.set(TrcFlags::HAS_PROOFS);
         }
         Self {
@@ -454,15 +457,13 @@ mod tests {
             .insert("opt_hint".to_string(), "vectorize".to_string());
 
         // n2: Arithmetic node with simple type signature
-        let n2 = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add))
-            .with_type_signature(TypeSignature::pure_fn(
-                vec![Type::i32(), Type::i32()],
-                Type::i32(),
-            ));
+        let n2 = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add)).with_type_signature(
+            TypeSignature::pure_fn(vec![Type::i32(), Type::i32()], Type::i32()),
+        );
 
         // n3: Another literal
-        let n3 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::f32()));
+        let n3 =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::f32()));
 
         let id1 = n1.id;
         let id2 = n2.id;
@@ -537,7 +538,9 @@ mod tests {
         let contracted_node = loaded
             .graph
             .nodes()
-            .find(|n| n.contract.is_some() && !n.contract.as_ref().unwrap().preconditions.is_empty())
+            .find(|n| {
+                n.contract.is_some() && !n.contract.as_ref().unwrap().preconditions.is_empty()
+            })
             .expect("should find contracted node");
 
         let c = contracted_node.contract.as_ref().unwrap();
@@ -676,8 +679,7 @@ mod tests {
     #[test]
     fn has_proofs_flag_not_set() {
         let mut g = Graph::new();
-        let n =
-            Node::new(NodeKind::Literal).with_contract(Contract::pure_default());
+        let n = Node::new(NodeKind::Literal).with_contract(Contract::pure_default());
         g.add_node(n).unwrap();
 
         let trc = TrcFile::new(g);
@@ -705,8 +707,7 @@ mod tests {
         bytes[8..16].copy_from_slice(&bad_count.to_le_bytes());
 
         // Recompute the hash so it doesn't fail on HashMismatch first
-        let payload_len =
-            u64::from_le_bytes(bytes[32..40].try_into().unwrap()) as usize;
+        let payload_len = u64::from_le_bytes(bytes[32..40].try_into().unwrap()) as usize;
         let payload_end = HEADER_SIZE + payload_len;
 
         let mut hasher = sha2::Sha256::new();

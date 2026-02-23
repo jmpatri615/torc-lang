@@ -58,15 +58,13 @@ fn build_adc_inputs(b: &mut GraphBuilder) -> AdcIds {
     let current_ty = f32_ty
         .clone()
         .refined(Predicate::in_range("value", -50, 50));
-    let voltage_ty = f32_ty
-        .clone()
-        .refined(Predicate::in_range("value", 0, 60));
+    let voltage_ty = f32_ty.clone().refined(Predicate::in_range("value", 0, 60));
     let temp_ty = f32_ty.refined(Predicate::in_range("value", 0, 150));
 
     let io_adc = |channel: &str| -> Contract {
-        Contract::pure_default().with_effects(EffectSet::from_effects(vec![Effect::IO(
-            format!("ADC1_{channel}"),
-        )]))
+        Contract::pure_default().with_effects(EffectSet::from_effects(vec![Effect::IO(format!(
+            "ADC1_{channel}"
+        ))]))
     };
 
     let source_ts = |ty: Type| TypeSignature::source(ty);
@@ -173,7 +171,8 @@ fn build_clarke_transform(b: &mut GraphBuilder, adc: &AdcIds) -> ClarkeIds {
         None,
         Some(prov()),
     );
-    b.annotate(one_over_sqrt3, "value", "0.57735026918962576").unwrap();
+    b.annotate(one_over_sqrt3, "value", "0.57735026918962576")
+        .unwrap();
 
     let two_ib = b.add_full_node(
         NodeKind::Arithmetic(ArithmeticOp::Mul),
@@ -243,15 +242,12 @@ fn build_park_transform(b: &mut GraphBuilder, clarke: &ClarkeIds) -> ParkIds {
         NodeKind::Read,
         "encoder_theta",
         Some(TypeSignature::source(
-            f32_ty
-                .clone()
-                .refined(Predicate::in_range("value", 0, 628)), // 0..2*pi*100
+            f32_ty.clone().refined(Predicate::in_range("value", 0, 628)), // 0..2*pi*100
         )),
         Some(
-            Contract::pure_default()
-                .with_effects(EffectSet::from_effects(vec![Effect::IO(
-                    "ENCODER_TIM3".into(),
-                )])),
+            Contract::pure_default().with_effects(EffectSet::from_effects(vec![Effect::IO(
+                "ENCODER_TIM3".into(),
+            )])),
         ),
         Some(prov()),
     );
@@ -260,10 +256,7 @@ fn build_park_transform(b: &mut GraphBuilder, clarke: &ClarkeIds) -> ParkIds {
     let cos_theta = b.add_full_node(
         NodeKind::FFICall,
         "cos_theta",
-        Some(TypeSignature::pure_fn(
-            vec![f32_ty.clone()],
-            f32_ty.clone(),
-        )),
+        Some(TypeSignature::pure_fn(vec![f32_ty.clone()], f32_ty.clone())),
         Some(park_contract.clone()),
         Some(prov()),
     );
@@ -272,10 +265,7 @@ fn build_park_transform(b: &mut GraphBuilder, clarke: &ClarkeIds) -> ParkIds {
     let sin_theta = b.add_full_node(
         NodeKind::FFICall,
         "sin_theta",
-        Some(TypeSignature::pure_fn(
-            vec![f32_ty.clone()],
-            f32_ty.clone(),
-        )),
+        Some(TypeSignature::pure_fn(vec![f32_ty.clone()], f32_ty.clone())),
         Some(park_contract.clone()),
         Some(prov()),
     );
@@ -378,11 +368,7 @@ fn build_park_transform(b: &mut GraphBuilder, clarke: &ClarkeIds) -> ParkIds {
 /// Each PID instance creates its own tunable setpoint literal (default 0.0).
 /// `measurement_node` provides the feedback signal (e.g., Park transform output).
 /// Instantiated twice (d-axis and q-axis) with separate names via `prefix`.
-fn build_pid_controller(
-    b: &mut GraphBuilder,
-    prefix: &str,
-    measurement_node: NodeId,
-) -> PidIds {
+fn build_pid_controller(b: &mut GraphBuilder, prefix: &str, measurement_node: NodeId) -> PidIds {
     let f32_ty = Type::f32();
     let pure_2_1 = TypeSignature::pure_fn(vec![f32_ty.clone(), f32_ty.clone()], f32_ty.clone());
     let pure_1_1 = TypeSignature::pure_fn(vec![f32_ty.clone()], f32_ty.clone());
@@ -689,7 +675,10 @@ fn build_safety_monitor(b: &mut GraphBuilder, adc: &AdcIds) -> SafetyIds {
     let pwm_enabled = b.add_full_node(
         NodeKind::Select,
         "safety_pwm_enabled",
-        Some(TypeSignature::pure_fn(vec![bool_ty.clone()], bool_ty.clone())),
+        Some(TypeSignature::pure_fn(
+            vec![bool_ty.clone()],
+            bool_ty.clone(),
+        )),
         None,
         Some(prov()),
     );
@@ -702,10 +691,9 @@ fn build_safety_monitor(b: &mut GraphBuilder, adc: &AdcIds) -> SafetyIds {
         "safety_gpio_fault",
         Some(TypeSignature::sink(Type::Bool)),
         Some(
-            safety_contract
-                .with_effects(EffectSet::from_effects(vec![Effect::IO(
-                    "GPIO_FAULT_PIN".into(),
-                )])),
+            safety_contract.with_effects(EffectSet::from_effects(vec![Effect::IO(
+                "GPIO_FAULT_PIN".into(),
+            )])),
         ),
         Some(prov()),
     );
@@ -775,9 +763,9 @@ fn build_pwm_outputs(
             .with_wcet(1_000, "stm32f407")
             .with_stack(16)
             .with_no_heap()
-            .with_effects(EffectSet::from_effects(vec![Effect::IO(
-                format!("PWM_TIM1_{ch}"),
-            )]))
+            .with_effects(EffectSet::from_effects(vec![Effect::IO(format!(
+                "PWM_TIM1_{ch}"
+            ))]))
     };
 
     // Inverse Park modeled as a simple sum (placeholder for full inverse transform)
@@ -798,30 +786,21 @@ fn build_pwm_outputs(
     let duty_a = b.add_full_node(
         NodeKind::Conversion,
         "svpwm_duty_a",
-        Some(TypeSignature::pure_fn(
-            vec![f32_ty.clone()],
-            f32_ty.clone(),
-        )),
+        Some(TypeSignature::pure_fn(vec![f32_ty.clone()], f32_ty.clone())),
         None,
         Some(prov()),
     );
     let duty_b = b.add_full_node(
         NodeKind::Conversion,
         "svpwm_duty_b",
-        Some(TypeSignature::pure_fn(
-            vec![f32_ty.clone()],
-            f32_ty.clone(),
-        )),
+        Some(TypeSignature::pure_fn(vec![f32_ty.clone()], f32_ty.clone())),
         None,
         Some(prov()),
     );
     let duty_c = b.add_full_node(
         NodeKind::Conversion,
         "svpwm_duty_c",
-        Some(TypeSignature::pure_fn(
-            vec![f32_ty.clone()],
-            f32_ty.clone(),
-        )),
+        Some(TypeSignature::pure_fn(vec![f32_ty.clone()], f32_ty.clone())),
         None,
         Some(prov()),
     );

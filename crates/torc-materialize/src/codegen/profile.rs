@@ -59,6 +59,9 @@ mod tests {
 
     #[test]
     fn default_profile() {
-        assert_eq!(OptimizationProfile::default(), OptimizationProfile::Balanced);
+        assert_eq!(
+            OptimizationProfile::default(),
+            OptimizationProfile::Balanced
+        );
     }
 }

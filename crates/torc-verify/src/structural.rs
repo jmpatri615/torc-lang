@@ -64,9 +64,7 @@ impl StructuralAnalyzer {
                     severity: Severity::Error,
                     message: err.to_string(),
                     node_id: None,
-                    suggestion: Some(
-                        "Declare required effects on the consuming node".into(),
-                    ),
+                    suggestion: Some("Declare required effects on the consuming node".into()),
                 });
             }
         }
@@ -166,8 +164,9 @@ mod tests {
         let diagnostics = StructuralAnalyzer::analyze(&g, &mut registry);
 
         // Should have at least one effect violation diagnostic
-        assert!(diagnostics.iter().any(|d| d.severity == Severity::Error
-            && d.message.contains("effect violation")));
+        assert!(diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Error && d.message.contains("effect violation")));
     }
 
     #[test]
@@ -185,8 +184,6 @@ mod tests {
         let diagnostics = StructuralAnalyzer::analyze(&g, &mut registry);
 
         assert!(!diagnostics.is_empty());
-        assert!(diagnostics
-            .iter()
-            .any(|d| d.severity == Severity::Error));
+        assert!(diagnostics.iter().any(|d| d.severity == Severity::Error));
     }
 }

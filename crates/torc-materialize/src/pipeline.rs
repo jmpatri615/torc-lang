@@ -55,9 +55,7 @@ pub fn materialize(
     let _verify_report = gate_or_halt(&graph, &config.gate)?;
 
     // Stage 3: Apply transforms
-    let transform_stats = config
-        .transforms
-        .apply_all(&mut graph, &config.platform);
+    let transform_stats = config.transforms.apply_all(&mut graph, &config.platform);
 
     // Stage 4a: Compute execution schedule
     let schedule = compute_schedule(&graph)?;
@@ -85,12 +83,10 @@ pub fn materialize(
 
             // Stage 6: Post-Materialization Verification
             let pv_passed = if let Some(ref exe_path) = output.executable_path {
-                let pv =
-                    crate::postverify::verify_binary(exe_path, layout.estimated_code_bytes)?;
+                let pv = crate::postverify::verify_binary(exe_path, layout.estimated_code_bytes)?;
                 Some(pv.passed)
             } else if let Some(ref obj_path) = output.object_path {
-                let pv =
-                    crate::postverify::verify_binary(obj_path, layout.estimated_code_bytes)?;
+                let pv = crate::postverify::verify_binary(obj_path, layout.estimated_code_bytes)?;
                 Some(pv.passed)
             } else {
                 None

@@ -48,8 +48,12 @@ pub fn build_graph() -> Graph {
         ),
         Some(prov()),
     );
-    b.annotate(input_data, "description", "Input byte stream for checksumming")
-        .unwrap();
+    b.annotate(
+        input_data,
+        "description",
+        "Input byte stream for checksumming",
+    )
+    .unwrap();
 
     // --- Initial accumulator: 0u32 ---
     let init_acc = b.add_full_node(
@@ -185,7 +189,9 @@ pub fn build_graph() -> Graph {
         "truncate_u32_to_u16",
         Some(TypeSignature::pure_fn(
             vec![u32_ty.clone()],
-            u16_ty.clone().refined(Predicate::in_range("value", 0, 65535)),
+            u16_ty
+                .clone()
+                .refined(Predicate::in_range("value", 0, 65535)),
         )),
         Some(pure_contract),
         Some(prov()),
@@ -199,9 +205,8 @@ pub fn build_graph() -> Graph {
         "checksum_output",
         Some(TypeSignature::sink(u16_ty)),
         Some(
-            Contract::pure_default().with_effects(EffectSet::from_effects(vec![Effect::IO(
-                "OUTPUT".into(),
-            )])),
+            Contract::pure_default()
+                .with_effects(EffectSet::from_effects(vec![Effect::IO("OUTPUT".into())])),
         ),
         Some(prov()),
     );

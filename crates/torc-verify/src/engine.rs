@@ -89,14 +89,9 @@ impl VerificationEngine {
                         let result = solver.check_obligation(&tracked.obligation);
                         match result {
                             crate::smt::SmtResult::Proven => {
-                                let witness =
-                                    generate_witness("z3", &tracked.obligation, vec![]);
+                                let witness = generate_witness("z3", &tracked.obligation, vec![]);
                                 self.cache.store(&tracked.obligation, witness.clone());
-                                registry.update_status(
-                                    id,
-                                    ProofStatus::Verified,
-                                    Some(witness),
-                                );
+                                registry.update_status(id, ProofStatus::Verified, Some(witness));
                             }
                             _ => {}
                         }

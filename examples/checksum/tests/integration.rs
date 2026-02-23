@@ -11,9 +11,24 @@ use torc_verify::profile::VerificationProfile;
 fn checksum_graph_construction() {
     let graph = build_graph();
     // Exact counts: 14 nodes, 16 edges, 0 regions
-    assert_eq!(graph.node_count(), 14, "expected 14 nodes, got {}", graph.node_count());
-    assert_eq!(graph.edge_count(), 16, "expected 16 edges, got {}", graph.edge_count());
-    assert_eq!(graph.region_count(), 0, "expected 0 regions, got {}", graph.region_count());
+    assert_eq!(
+        graph.node_count(),
+        14,
+        "expected 14 nodes, got {}",
+        graph.node_count()
+    );
+    assert_eq!(
+        graph.edge_count(),
+        16,
+        "expected 16 edges, got {}",
+        graph.edge_count()
+    );
+    assert_eq!(
+        graph.region_count(),
+        0,
+        "expected 0 regions, got {}",
+        graph.region_count()
+    );
 }
 
 #[test]
@@ -38,7 +53,11 @@ fn checksum_verify_development() {
     let report = engine.verify(&graph);
 
     // Should have at least type-checking and refinement obligations
-    assert!(report.summary.total >= 2, "expected >= 2 obligations, got {}", report.summary.total);
+    assert!(
+        report.summary.total >= 2,
+        "expected >= 2 obligations, got {}",
+        report.summary.total
+    );
 }
 
 #[test]
@@ -77,6 +96,8 @@ fn checksum_dataflow_view() {
 #[test]
 fn checksum_topological_sort() {
     let graph = build_graph();
-    let topo = graph.topological_sort().expect("topological sort should succeed");
+    let topo = graph
+        .topological_sort()
+        .expect("topological sort should succeed");
     assert_eq!(topo.len(), 14, "all 14 nodes should be in topo order");
 }

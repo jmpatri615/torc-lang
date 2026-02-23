@@ -79,12 +79,11 @@ fn resolve_one(
         });
     }
 
-    let req = version::parse_requirement(req_str).map_err(|_| {
-        RegistryError::NoMatchingVersion {
+    let req =
+        version::parse_requirement(req_str).map_err(|_| RegistryError::NoMatchingVersion {
             name: name.to_string(),
             requirement: req_str.to_string(),
-        }
-    })?;
+        })?;
 
     let available = backend.list_versions(name)?;
     if available.is_empty() {
@@ -146,12 +145,7 @@ mod tests {
     use crate::integrity::ContentHash;
     use crate::module_manifest::ModuleManifest;
 
-    fn publish_module(
-        registry: &LocalRegistry,
-        name: &str,
-        version: &str,
-        deps: &[(&str, &str)],
-    ) {
+    fn publish_module(registry: &LocalRegistry, name: &str, version: &str, deps: &[(&str, &str)]) {
         let deps_toml: String = deps
             .iter()
             .map(|(n, v)| format!("{n} = \"{v}\""))

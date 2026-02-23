@@ -21,9 +21,9 @@ pub mod transform;
 
 pub use canonicalize::{canonicalize, CanonicalizationStats};
 #[cfg(feature = "llvm")]
-pub use codegen::{emit_code, CodegenConfig, CodegenOutput, EmitTarget};
-#[cfg(feature = "llvm")]
 pub use codegen::profile::OptimizationProfile;
+#[cfg(feature = "llvm")]
+pub use codegen::{emit_code, CodegenConfig, CodegenOutput, EmitTarget};
 pub use error::MaterializationError;
 pub use gate::{gate_or_halt, verification_gate, GateConfig, GateDecision};
 pub use layout::{estimate_layout, estimate_type_size, MemoryLayout, TypeSize};

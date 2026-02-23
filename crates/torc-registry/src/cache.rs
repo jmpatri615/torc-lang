@@ -267,15 +267,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let cache = ModuleCache::new(dir.path().to_path_buf());
 
-        cache
-            .store("mymod", "1.0.0", b"m1", b"t1")
-            .unwrap();
-        cache
-            .store("mymod", "1.1.0", b"m2", b"t2")
-            .unwrap();
-        cache
-            .store("mymod", "2.0.0", b"m3", b"t3")
-            .unwrap();
+        cache.store("mymod", "1.0.0", b"m1", b"t1").unwrap();
+        cache.store("mymod", "1.1.0", b"m2", b"t2").unwrap();
+        cache.store("mymod", "2.0.0", b"m3", b"t3").unwrap();
 
         let versions = cache.list_versions("mymod").unwrap();
         assert_eq!(versions, vec!["1.0.0", "1.1.0", "2.0.0"]);

@@ -216,7 +216,11 @@ fn parse_base_type(tokens: &[&str]) -> Result<(CType, usize)> {
         let name = tokens[pos].to_string();
         pos += 1;
         let ct = CType::OpaqueStruct(name);
-        let ct = if is_const { CType::Const(Box::new(ct)) } else { ct };
+        let ct = if is_const {
+            CType::Const(Box::new(ct))
+        } else {
+            ct
+        };
         return Ok((ct, pos));
     }
 
@@ -228,8 +232,16 @@ fn parse_base_type(tokens: &[&str]) -> Result<(CType, usize)> {
         pos += 1;
         if pos >= tokens.len() {
             // bare `unsigned` or `signed` means `unsigned int` / `signed int`
-            let ct = if is_unsigned { CType::UnsignedInt } else { CType::Int };
-            let ct = if is_const { CType::Const(Box::new(ct)) } else { ct };
+            let ct = if is_unsigned {
+                CType::UnsignedInt
+            } else {
+                CType::Int
+            };
+            let ct = if is_const {
+                CType::Const(Box::new(ct))
+            } else {
+                ct
+            };
             return Ok((ct, pos));
         }
 
@@ -237,22 +249,38 @@ fn parse_base_type(tokens: &[&str]) -> Result<(CType, usize)> {
         let ct = match next {
             "char" => {
                 pos += 1;
-                if is_unsigned { CType::UnsignedChar } else { CType::SignedChar }
+                if is_unsigned {
+                    CType::UnsignedChar
+                } else {
+                    CType::SignedChar
+                }
             }
             "short" => {
                 pos += 1;
-                if is_unsigned { CType::UnsignedShort } else { CType::Short }
+                if is_unsigned {
+                    CType::UnsignedShort
+                } else {
+                    CType::Short
+                }
             }
             "int" => {
                 pos += 1;
-                if is_unsigned { CType::UnsignedInt } else { CType::Int }
+                if is_unsigned {
+                    CType::UnsignedInt
+                } else {
+                    CType::Int
+                }
             }
             "long" => {
                 pos += 1;
                 // Check for `long long`
                 if pos < tokens.len() && tokens[pos] == "long" {
                     pos += 1;
-                    if is_unsigned { CType::UnsignedLongLong } else { CType::LongLong }
+                    if is_unsigned {
+                        CType::UnsignedLongLong
+                    } else {
+                        CType::LongLong
+                    }
                 } else if is_unsigned {
                     CType::UnsignedLong
                 } else {
@@ -261,19 +289,39 @@ fn parse_base_type(tokens: &[&str]) -> Result<(CType, usize)> {
             }
             _ => {
                 // Just `unsigned` with no recognized type → unsigned int
-                if is_unsigned { CType::UnsignedInt } else { CType::Int }
+                if is_unsigned {
+                    CType::UnsignedInt
+                } else {
+                    CType::Int
+                }
             }
         };
-        let ct = if is_const { CType::Const(Box::new(ct)) } else { ct };
+        let ct = if is_const {
+            CType::Const(Box::new(ct))
+        } else {
+            ct
+        };
         return Ok((ct, pos));
     }
 
     // Simple type keywords
     let ct = match tokens[pos] {
-        "void" => { pos += 1; CType::Void }
-        "char" => { pos += 1; CType::Char }
-        "short" => { pos += 1; CType::Short }
-        "int" => { pos += 1; CType::Int }
+        "void" => {
+            pos += 1;
+            CType::Void
+        }
+        "char" => {
+            pos += 1;
+            CType::Char
+        }
+        "short" => {
+            pos += 1;
+            CType::Short
+        }
+        "int" => {
+            pos += 1;
+            CType::Int
+        }
         "long" => {
             pos += 1;
             if pos < tokens.len() && tokens[pos] == "long" {
@@ -286,26 +334,69 @@ fn parse_base_type(tokens: &[&str]) -> Result<(CType, usize)> {
                 CType::Long
             }
         }
-        "float" => { pos += 1; CType::Float }
-        "double" => { pos += 1; CType::Double }
-        "_Bool" => { pos += 1; CType::Bool }
-        "bool" => { pos += 1; CType::Bool }
-        "size_t" => { pos += 1; CType::SizeT }
-        "int8_t" => { pos += 1; CType::Int8 }
-        "int16_t" => { pos += 1; CType::Int16 }
-        "int32_t" => { pos += 1; CType::Int32 }
-        "int64_t" => { pos += 1; CType::Int64 }
-        "uint8_t" => { pos += 1; CType::UInt8 }
-        "uint16_t" => { pos += 1; CType::UInt16 }
-        "uint32_t" => { pos += 1; CType::UInt32 }
-        "uint64_t" => { pos += 1; CType::UInt64 }
+        "float" => {
+            pos += 1;
+            CType::Float
+        }
+        "double" => {
+            pos += 1;
+            CType::Double
+        }
+        "_Bool" => {
+            pos += 1;
+            CType::Bool
+        }
+        "bool" => {
+            pos += 1;
+            CType::Bool
+        }
+        "size_t" => {
+            pos += 1;
+            CType::SizeT
+        }
+        "int8_t" => {
+            pos += 1;
+            CType::Int8
+        }
+        "int16_t" => {
+            pos += 1;
+            CType::Int16
+        }
+        "int32_t" => {
+            pos += 1;
+            CType::Int32
+        }
+        "int64_t" => {
+            pos += 1;
+            CType::Int64
+        }
+        "uint8_t" => {
+            pos += 1;
+            CType::UInt8
+        }
+        "uint16_t" => {
+            pos += 1;
+            CType::UInt16
+        }
+        "uint32_t" => {
+            pos += 1;
+            CType::UInt32
+        }
+        "uint64_t" => {
+            pos += 1;
+            CType::UInt64
+        }
         other => {
             return Err(FfiError::InvalidCSignature {
                 detail: format!("unknown type '{other}'"),
             });
         }
     };
-    let ct = if is_const { CType::Const(Box::new(ct)) } else { ct };
+    let ct = if is_const {
+        CType::Const(Box::new(ct))
+    } else {
+        ct
+    };
     Ok((ct, pos))
 }
 
@@ -496,10 +587,7 @@ mod tests {
     fn parse_pointer_return() {
         let sig = CSignature::parse("void* malloc(size_t size)").unwrap();
         assert_eq!(sig.name, "malloc");
-        assert_eq!(
-            sig.return_type,
-            CType::Pointer(Box::new(CType::Void))
-        );
+        assert_eq!(sig.return_type, CType::Pointer(Box::new(CType::Void)));
         assert_eq!(sig.parameters[0].param_type, CType::SizeT);
     }
 
@@ -524,8 +612,7 @@ mod tests {
 
     #[test]
     fn parse_stdint_types() {
-        let sig =
-            CSignature::parse("int32_t foo(uint8_t a, int64_t b)").unwrap();
+        let sig = CSignature::parse("int32_t foo(uint8_t a, int64_t b)").unwrap();
         assert_eq!(sig.name, "foo");
         assert_eq!(sig.return_type, CType::Int32);
         assert_eq!(sig.parameters[0].param_type, CType::UInt8);
@@ -534,8 +621,7 @@ mod tests {
 
     #[test]
     fn parse_multi_param() {
-        let sig = CSignature::parse("double fma(double x, double y, double z)")
-            .unwrap();
+        let sig = CSignature::parse("double fma(double x, double y, double z)").unwrap();
         assert_eq!(sig.name, "fma");
         assert_eq!(sig.parameters.len(), 3);
         for p in &sig.parameters {

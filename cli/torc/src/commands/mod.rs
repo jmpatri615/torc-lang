@@ -7,6 +7,6 @@ pub mod doctor;
 pub mod ffi;
 pub mod init;
 pub mod inspect;
-pub mod target;
 pub mod registry;
+pub mod target;
 pub mod verify;

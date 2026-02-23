@@ -209,7 +209,8 @@ impl IntervalAnalyzer {
                 let r = Self::check_with_env(rhs, env);
                 match (&l, &r) {
                     (IntervalResult::Proven, IntervalResult::Proven) => IntervalResult::Proven,
-                    (IntervalResult::Disproven { .. }, _) | (_, IntervalResult::Disproven { .. }) => {
+                    (IntervalResult::Disproven { .. }, _)
+                    | (_, IntervalResult::Disproven { .. }) => {
                         // Return the first disproven
                         if matches!(l, IntervalResult::Disproven { .. }) {
                             l
@@ -244,18 +245,10 @@ impl IntervalAnalyzer {
             Predicate::IntLit(n) => Interval::point(*n as f64),
             Predicate::FloatLit(f) => Interval::point(*f),
             Predicate::Var(name) => env.get(name).cloned().unwrap_or(Interval::unbounded()),
-            Predicate::Add(a, b) => {
-                Self::eval_interval(a, env).add(&Self::eval_interval(b, env))
-            }
-            Predicate::Sub(a, b) => {
-                Self::eval_interval(a, env).sub(&Self::eval_interval(b, env))
-            }
-            Predicate::Mul(a, b) => {
-                Self::eval_interval(a, env).mul(&Self::eval_interval(b, env))
-            }
-            Predicate::Div(a, b) => {
-                Self::eval_interval(a, env).div(&Self::eval_interval(b, env))
-            }
+            Predicate::Add(a, b) => Self::eval_interval(a, env).add(&Self::eval_interval(b, env)),
+            Predicate::Sub(a, b) => Self::eval_interval(a, env).sub(&Self::eval_interval(b, env)),
+            Predicate::Mul(a, b) => Self::eval_interval(a, env).mul(&Self::eval_interval(b, env)),
+            Predicate::Div(a, b) => Self::eval_interval(a, env).div(&Self::eval_interval(b, env)),
             Predicate::Neg(a) => Self::eval_interval(a, env).neg(),
             _ => Interval::unbounded(),
         }

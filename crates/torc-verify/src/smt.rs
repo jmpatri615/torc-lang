@@ -91,10 +91,7 @@ impl SmtSolver {
 
 /// Translate a Torc Predicate to a Z3 boolean AST.
 #[cfg(feature = "z3")]
-fn predicate_to_z3<'ctx>(
-    ctx: &'ctx z3::Context,
-    pred: &Predicate,
-) -> Option<z3::ast::Bool<'ctx>> {
+fn predicate_to_z3<'ctx>(ctx: &'ctx z3::Context, pred: &Predicate) -> Option<z3::ast::Bool<'ctx>> {
     use z3::ast::{Ast, Bool, Int};
 
     match pred {
@@ -216,10 +213,7 @@ fn expr_to_z3_int<'ctx>(ctx: &'ctx z3::Context, expr: &Predicate) -> Option<z3::
 
 /// Extract variable assignments from a Z3 model as a counterexample.
 #[cfg(feature = "z3")]
-fn extract_model(
-    model: &z3::Model,
-    predicate: &Predicate,
-) -> HashMap<String, String> {
+fn extract_model(model: &z3::Model, predicate: &Predicate) -> HashMap<String, String> {
     let mut vars = Vec::new();
     collect_vars(predicate, &mut vars);
 
@@ -264,8 +258,7 @@ fn collect_vars(pred: &Predicate, vars: &mut Vec<String>) {
             collect_vars(b, vars);
         }
         Predicate::Not(a) | Predicate::Neg(a) => collect_vars(a, vars),
-        Predicate::ForAll { var, body, range }
-        | Predicate::Exists { var, body, range } => {
+        Predicate::ForAll { var, body, range } | Predicate::Exists { var, body, range } => {
             if !vars.contains(var) {
                 vars.push(var.clone());
             }

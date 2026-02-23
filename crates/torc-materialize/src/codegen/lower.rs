@@ -47,12 +47,12 @@ fn collect_inputs<'ctx>(
     let mut inputs: Vec<(usize, BasicValueEnum<'ctx>)> = Vec::new();
 
     for edge_id in incoming {
-        let edge = graph.get_edge(edge_id).ok_or_else(|| {
-            MaterializationError::CodegenFailed {
+        let edge = graph
+            .get_edge(edge_id)
+            .ok_or_else(|| MaterializationError::CodegenFailed {
                 stage: "lower".into(),
                 message: format!("edge {edge_id} not found"),
-            }
-        })?;
+            })?;
         let src_node_id = edge.source.0;
         let src_port = edge.source.1;
         let dst_port = edge.target.1;
@@ -125,24 +125,23 @@ fn lower_literal<'ctx>(
     let base_ty = out_ty.base_type();
     let llvm_val: BasicValueEnum<'ctx> = match base_ty {
         Type::Bool => {
-            let v: bool = value_str.parse().map_err(|_| {
-                MaterializationError::CodegenFailed {
+            let v: bool = value_str
+                .parse()
+                .map_err(|_| MaterializationError::CodegenFailed {
                     stage: "lower_literal".into(),
                     message: format!("cannot parse bool from \"{value_str}\""),
-                }
-            })?;
+                })?;
             ctx.llvm_context()
                 .bool_type()
                 .const_int(v as u64, false)
                 .into()
         }
         Type::Int { width, signedness } => {
-            let v: i128 = parse_int_literal(value_str).map_err(|_| {
-                MaterializationError::CodegenFailed {
+            let v: i128 =
+                parse_int_literal(value_str).map_err(|_| MaterializationError::CodegenFailed {
                     stage: "lower_literal".into(),
                     message: format!("cannot parse int from \"{value_str}\""),
-                }
-            })?;
+                })?;
             let sign_extend = *signedness == Signedness::Signed;
             ctx.llvm_context()
                 .custom_width_int_type(*width as u32)
@@ -150,12 +149,12 @@ fn lower_literal<'ctx>(
                 .into()
         }
         Type::Float { precision } => {
-            let v: f64 = value_str.parse().map_err(|_| {
-                MaterializationError::CodegenFailed {
+            let v: f64 = value_str
+                .parse()
+                .map_err(|_| MaterializationError::CodegenFailed {
                     stage: "lower_literal".into(),
                     message: format!("cannot parse float from \"{value_str}\""),
-                }
-            })?;
+                })?;
             let float_ty = match precision {
                 torc_core::types::FloatPrecision::F16 => ctx.llvm_context().f16_type(),
                 torc_core::types::FloatPrecision::F32 => ctx.llvm_context().f32_type(),
@@ -463,7 +462,13 @@ fn lower_conversion<'ctx>(
 
     let result: BasicValueEnum<'ctx> = match (in_base, out_base) {
         // Int -> Int (widening, narrowing, sign change)
-        (Type::Int { .. }, Type::Int { width: out_w, signedness: out_s }) => {
+        (
+            Type::Int { .. },
+            Type::Int {
+                width: out_w,
+                signedness: out_s,
+            },
+        ) => {
             let out_llvm_ty = ctx.llvm_context().custom_width_int_type(*out_w as u32);
             let sign_extend = *out_s == Signedness::Signed;
             ctx.builder()
@@ -505,7 +510,13 @@ fn lower_conversion<'ctx>(
             }
         }
         // Float -> Int
-        (Type::Float { .. }, Type::Int { width: out_w, signedness: out_s }) => {
+        (
+            Type::Float { .. },
+            Type::Int {
+                width: out_w,
+                signedness: out_s,
+            },
+        ) => {
             let out_llvm_ty = ctx.llvm_context().custom_width_int_type(*out_w as u32);
             if *out_s == Signedness::Signed {
                 ctx.builder()
@@ -569,10 +580,7 @@ fn one_input<'ctx>(
     if inputs.is_empty() {
         return Err(MaterializationError::CodegenFailed {
             stage: "lower".into(),
-            message: format!(
-                "node {} ({}) requires 1 input, got 0",
-                node.id, node.kind
-            ),
+            message: format!("node {} ({}) requires 1 input, got 0", node.id, node.kind),
         });
     }
     Ok(inputs[0])
@@ -626,8 +634,7 @@ mod tests {
 
         let mut node =
             Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
-        node.annotations
-            .insert("value".into(), "42".into());
+        node.annotations.insert("value".into(), "42".into());
 
         let graph = Graph::new();
         lower_node(&node, &graph, &mut cg).unwrap();
@@ -643,8 +650,7 @@ mod tests {
 
         let mut node =
             Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::f64()));
-        node.annotations
-            .insert("value".into(), "3.14".into());
+        node.annotations.insert("value".into(), "3.14".into());
 
         let graph = Graph::new();
         lower_node(&node, &graph, &mut cg).unwrap();
@@ -666,11 +672,9 @@ mod tests {
         let mut lit2 =
             Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
         lit2.annotations.insert("value".into(), "20".into());
-        let add_node = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add))
-            .with_type_signature(TypeSignature::new(
-                vec![Type::i32(), Type::i32()],
-                vec![Type::i32()],
-            ));
+        let add_node = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add)).with_type_signature(
+            TypeSignature::new(vec![Type::i32(), Type::i32()], vec![Type::i32()]),
+        );
 
         let id1 = graph.add_node(lit1.clone()).unwrap();
         let id2 = graph.add_node(lit2.clone()).unwrap();
@@ -705,11 +709,9 @@ mod tests {
         let mut lit2 =
             Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
         lit2.annotations.insert("value".into(), "5".into());
-        let cmp = Node::new(NodeKind::Comparison(ComparisonOp::Eq))
-            .with_type_signature(TypeSignature::new(
-                vec![Type::i32(), Type::i32()],
-                vec![Type::Bool],
-            ));
+        let cmp = Node::new(NodeKind::Comparison(ComparisonOp::Eq)).with_type_signature(
+            TypeSignature::new(vec![Type::i32(), Type::i32()], vec![Type::Bool]),
+        );
 
         let id1 = graph.add_node(lit1).unwrap();
         let id2 = graph.add_node(lit2).unwrap();
@@ -741,11 +743,9 @@ mod tests {
         let mut lit2 =
             Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::u32()));
         lit2.annotations.insert("value".into(), "0x0F".into());
-        let and_node = Node::new(NodeKind::Bitwise(BitwiseOp::And))
-            .with_type_signature(TypeSignature::new(
-                vec![Type::u32(), Type::u32()],
-                vec![Type::u32()],
-            ));
+        let and_node = Node::new(NodeKind::Bitwise(BitwiseOp::And)).with_type_signature(
+            TypeSignature::new(vec![Type::u32(), Type::u32()], vec![Type::u32()]),
+        );
 
         let id1 = graph.add_node(lit1).unwrap();
         let id2 = graph.add_node(lit2).unwrap();
@@ -818,11 +818,9 @@ mod tests {
         let mut lit2 =
             Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::f64()));
         lit2.annotations.insert("value".into(), "2.5".into());
-        let add_node = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add))
-            .with_type_signature(TypeSignature::new(
-                vec![Type::f64(), Type::f64()],
-                vec![Type::f64()],
-            ));
+        let add_node = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add)).with_type_signature(
+            TypeSignature::new(vec![Type::f64(), Type::f64()], vec![Type::f64()]),
+        );
 
         let id1 = graph.add_node(lit1).unwrap();
         let id2 = graph.add_node(lit2).unwrap();
@@ -851,10 +849,8 @@ mod tests {
         let mut lit =
             Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
         lit.annotations.insert("value".into(), "42".into());
-        let conv = Node::new(NodeKind::Conversion).with_type_signature(TypeSignature::new(
-            vec![Type::i32()],
-            vec![Type::f64()],
-        ));
+        let conv = Node::new(NodeKind::Conversion)
+            .with_type_signature(TypeSignature::new(vec![Type::i32()], vec![Type::f64()]));
 
         let id1 = graph.add_node(lit).unwrap();
         let id2 = graph.add_node(conv).unwrap();
@@ -878,10 +874,8 @@ mod tests {
         let mut lit =
             Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::f64()));
         lit.annotations.insert("value".into(), "3.14".into());
-        let conv = Node::new(NodeKind::Conversion).with_type_signature(TypeSignature::new(
-            vec![Type::f64()],
-            vec![Type::i32()],
-        ));
+        let conv = Node::new(NodeKind::Conversion)
+            .with_type_signature(TypeSignature::new(vec![Type::f64()], vec![Type::i32()]));
 
         let id1 = graph.add_node(lit).unwrap();
         let id2 = graph.add_node(conv).unwrap();

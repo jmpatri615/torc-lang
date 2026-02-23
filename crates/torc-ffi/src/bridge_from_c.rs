@@ -26,7 +26,15 @@ pub fn generate_bridge(decl: &FfiDeclaration, word_bits: u8) -> Result<Graph> {
     let lib = &decl.foreign_library;
 
     for func in decl.active_functions() {
-        generate_function_bridge(&mut builder, lib.name.as_str(), lib.abi.as_str(), lib.header.as_deref(), lib.link.as_deref(), func, word_bits)?;
+        generate_function_bridge(
+            &mut builder,
+            lib.name.as_str(),
+            lib.abi.as_str(),
+            lib.header.as_deref(),
+            lib.link.as_deref(),
+            func,
+            word_bits,
+        )?;
     }
 
     Ok(builder.into_graph())
@@ -65,9 +73,8 @@ fn generate_function_bridge(
     let type_sig = TypeSignature::new(input_types.clone(), outputs.clone());
 
     // Build contract with FFI effect
-    let contract = Contract::pure_default().with_effects(EffectSet::from_effects(vec![
-        Effect::FFI(abi.to_string()),
-    ]));
+    let contract = Contract::pure_default()
+        .with_effects(EffectSet::from_effects(vec![Effect::FFI(abi.to_string())]));
 
     // Build provenance
     let provenance = Provenance::toolchain_generated(
@@ -104,9 +111,15 @@ fn generate_function_bridge(
     );
 
     // Add annotations
-    builder.annotate(ffi_id, "ffi.library", lib_name).map_err(FfiError::Graph)?;
-    builder.annotate(ffi_id, "ffi.function", &func.name).map_err(FfiError::Graph)?;
-    builder.annotate(ffi_id, "ffi.abi", abi).map_err(FfiError::Graph)?;
+    builder
+        .annotate(ffi_id, "ffi.library", lib_name)
+        .map_err(FfiError::Graph)?;
+    builder
+        .annotate(ffi_id, "ffi.function", &func.name)
+        .map_err(FfiError::Graph)?;
+    builder
+        .annotate(ffi_id, "ffi.abi", abi)
+        .map_err(FfiError::Graph)?;
     builder
         .annotate(ffi_id, "ffi.trust_level", &trust.to_string())
         .map_err(FfiError::Graph)?;
@@ -114,10 +127,14 @@ fn generate_function_bridge(
         .annotate(ffi_id, "ffi.c_signature", &func.c_signature)
         .map_err(FfiError::Graph)?;
     if let Some(header) = header {
-        builder.annotate(ffi_id, "ffi.header", header).map_err(FfiError::Graph)?;
+        builder
+            .annotate(ffi_id, "ffi.header", header)
+            .map_err(FfiError::Graph)?;
     }
     if let Some(link) = link {
-        builder.annotate(ffi_id, "ffi.link", link).map_err(FfiError::Graph)?;
+        builder
+            .annotate(ffi_id, "ffi.link", link)
+            .map_err(FfiError::Graph)?;
     }
 
     // --- Connect pre → ffi ---
@@ -230,11 +247,7 @@ fn generate_function_bridge(
                     _ => {
                         // Unknown key — store as generic annotation
                         builder
-                            .annotate(
-                                ffi_id,
-                                &format!("ffi.contract.{key}"),
-                                value,
-                            )
+                            .annotate(ffi_id, &format!("ffi.contract.{key}"), value)
                             .map_err(FfiError::Graph)?;
                     }
                 }
@@ -245,7 +258,11 @@ fn generate_function_bridge(
     // --- Add warning annotation for unsafe trust level ---
     if trust.adds_warnings() {
         builder
-            .annotate(ffi_id, "ffi.warning", "unverified foreign code — use at own risk")
+            .annotate(
+                ffi_id,
+                "ffi.warning",
+                "unverified foreign code — use at own risk",
+            )
             .map_err(FfiError::Graph)?;
     }
 
@@ -412,7 +429,10 @@ trust_level = "unsafe"
         assert_eq!(ffi_node.annotations.get("ffi.abi").unwrap(), "C");
         assert_eq!(ffi_node.annotations.get("ffi.header").unwrap(), "math.h");
         assert_eq!(ffi_node.annotations.get("ffi.link").unwrap(), "-lm");
-        assert_eq!(ffi_node.annotations.get("ffi.trust_level").unwrap(), "platform");
+        assert_eq!(
+            ffi_node.annotations.get("ffi.trust_level").unwrap(),
+            "platform"
+        );
     }
 
     #[test]
@@ -445,10 +465,25 @@ time: <= 100ns @ x86_64-generic
         assert!(ffi_node.annotations.contains_key("ffi.contract.raw"));
 
         // Parsed key-value pairs
-        assert!(ffi_node.annotations.get("ffi.contract.input").unwrap().contains("Float<64>"));
-        assert!(ffi_node.annotations.get("ffi.contract.output").unwrap().contains("value >= -1.0"));
-        assert_eq!(ffi_node.annotations.get("ffi.contract.effects").unwrap(), "Pure");
-        assert!(ffi_node.annotations.get("ffi.contract.time").unwrap().contains("100ns"));
+        assert!(ffi_node
+            .annotations
+            .get("ffi.contract.input")
+            .unwrap()
+            .contains("Float<64>"));
+        assert!(ffi_node
+            .annotations
+            .get("ffi.contract.output")
+            .unwrap()
+            .contains("value >= -1.0"));
+        assert_eq!(
+            ffi_node.annotations.get("ffi.contract.effects").unwrap(),
+            "Pure"
+        );
+        assert!(ffi_node
+            .annotations
+            .get("ffi.contract.time")
+            .unwrap()
+            .contains("100ns"));
     }
 
     #[test]

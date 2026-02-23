@@ -147,12 +147,7 @@ impl IsaModel {
             ],
             calling_conventions: vec![CallingConvention {
                 name: "AAPCS".into(),
-                argument_registers: vec![
-                    "r0".into(),
-                    "r1".into(),
-                    "r2".into(),
-                    "r3".into(),
-                ],
+                argument_registers: vec!["r0".into(), "r1".into(), "r2".into(), "r3".into()],
                 return_registers: vec!["r0".into(), "r1".into()],
                 callee_saved: vec![
                     "r4".into(),

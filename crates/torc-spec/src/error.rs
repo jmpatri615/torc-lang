@@ -12,11 +12,7 @@ pub enum SpecError {
     AssumptionNotFound(Uuid),
 
     #[error("invalid state transition from {from} to {to} for decision {id}")]
-    InvalidTransition {
-        id: Uuid,
-        from: String,
-        to: String,
-    },
+    InvalidTransition { id: Uuid, from: String, to: String },
 
     #[error("decision {id} is in state {state}, expected {expected}")]
     WrongState {

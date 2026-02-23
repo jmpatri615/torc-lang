@@ -201,9 +201,7 @@ mod tests {
 
     #[test]
     fn energy_generates_obligation() {
-        let c = Contract::pure_default().with_effects(
-            EffectSet::pure_set(),
-        );
+        let c = Contract::pure_default().with_effects(EffectSet::pure_set());
         let mut c2 = c;
         c2.energy_bound = Some(EnergyBound { max_uj: 500 });
         let obs = c2.generate_obligations();

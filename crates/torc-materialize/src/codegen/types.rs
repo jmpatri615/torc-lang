@@ -115,10 +115,9 @@ pub fn to_llvm_type<'ctx>(ty: &Type, context: &'ctx Context) -> Option<BasicType
         | Type::Approximate { inner, .. } => to_llvm_type(inner, context),
 
         // Unsupported in Pass 2
-        Type::Vec { .. }
-        | Type::Distribution(_)
-        | Type::Named(_)
-        | Type::Parameterized { .. } => None,
+        Type::Vec { .. } | Type::Distribution(_) | Type::Named(_) | Type::Parameterized { .. } => {
+            None
+        }
     }
 }
 

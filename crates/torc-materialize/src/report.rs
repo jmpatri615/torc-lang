@@ -74,7 +74,11 @@ impl fmt::Display for MaterializationReport {
                 writeln!(
                     f,
                     "  Pass {}: +{} nodes, -{} nodes, +{} edges, -{} edges",
-                    i, stats.nodes_added, stats.nodes_removed, stats.edges_added, stats.edges_removed,
+                    i,
+                    stats.nodes_added,
+                    stats.nodes_removed,
+                    stats.edges_added,
+                    stats.edges_removed,
                 )?;
             }
         }

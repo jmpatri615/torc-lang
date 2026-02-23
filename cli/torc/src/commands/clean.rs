@@ -21,10 +21,7 @@ pub fn run(project_dir: &Path, proofs: bool) -> Result<()> {
             fs::remove_dir_all(&proofs_dir)?;
             println!("Removed {}", proofs_dir.display());
         } else {
-            println!(
-                "Already clean: {} does not exist",
-                proofs_dir.display()
-            );
+            println!("Already clean: {} does not exist", proofs_dir.display());
         }
     }
 

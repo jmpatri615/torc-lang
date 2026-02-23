@@ -57,19 +57,18 @@ pub fn run(
     };
 
     // Parse view kind and format
-    let view_kind = ViewKind::parse(view_name)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
-    let format = export
-        .map(ViewFormat::parse)
-        .unwrap_or(ViewFormat::Text);
+    let view_kind = ViewKind::parse(view_name).map_err(|e| anyhow::anyhow!("{e}"))?;
+    let format = export.map(ViewFormat::parse).unwrap_or(ViewFormat::Text);
 
     // Resolve optional platform
     let platform = if let Some(target_name) = target {
-        Some(resolve_target(target_name, Some(project_dir)).ok_or_else(|| {
-            anyhow::anyhow!(
+        Some(
+            resolve_target(target_name, Some(project_dir)).ok_or_else(|| {
+                anyhow::anyhow!(
                 "unknown target: '{target_name}'. Use 'torc target list' to see available targets."
             )
-        })?)
+            })?,
+        )
     } else {
         None
     };
@@ -157,14 +156,7 @@ mod tests {
         let project_path = dir.path().join("json-test");
         crate::commands::init::create_project(&project_path, "json-test").unwrap();
 
-        run(
-            &project_path,
-            Some("contracts"),
-            None,
-            Some("json"),
-            None,
-        )
-        .unwrap();
+        run(&project_path, Some("contracts"), None, Some("json"), None).unwrap();
     }
 
     /// Test: unknown view returns error.

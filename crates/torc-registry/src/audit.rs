@@ -51,10 +51,7 @@ pub struct AuditSummary {
 }
 
 /// Run an audit on the resolved dependencies.
-pub fn audit(
-    resolution: &ResolutionResult,
-    backend: &dyn RegistryBackend,
-) -> Result<AuditReport> {
+pub fn audit(resolution: &ResolutionResult, backend: &dyn RegistryBackend) -> Result<AuditReport> {
     let mut entries = Vec::new();
 
     for lock_entry in &resolution.lock {
@@ -142,10 +139,7 @@ pub fn format_report(report: &AuditReport) -> String {
     let mut out = String::new();
 
     for entry in &report.entries {
-        let level = entry
-            .integrity_level
-            .as_deref()
-            .unwrap_or("unspecified");
+        let level = entry.integrity_level.as_deref().unwrap_or("unspecified");
         let coverage = entry
             .verification_coverage
             .map(|c| format!("{c}%"))

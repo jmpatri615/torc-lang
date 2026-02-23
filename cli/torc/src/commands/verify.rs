@@ -41,9 +41,8 @@ pub fn run(
         TrcFile::from_bytes(&bytes).with_context(|| format!("parsing {}", graph_path.display()))?;
 
     // Resolve profile (CLI flag > manifest default > development)
-    let effective_profile = profile.or_else(|| {
-        manifest.and_then(|m| m.default_verification_profile())
-    });
+    let effective_profile =
+        profile.or_else(|| manifest.and_then(|m| m.default_verification_profile()));
     let mut vprofile = resolve_profile(effective_profile)?;
 
     // Decision-aware profile adjustment

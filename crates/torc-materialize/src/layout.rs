@@ -235,7 +235,11 @@ pub fn estimate_layout(
     let peak_stack_bytes = compute_peak_stack(graph, &frame_map);
 
     // Code size heuristic: per-node instruction estimate * platform multiplier
-    let code_multiplier = if platform.isa.word_size == 32 { 4u64 } else { 8 };
+    let code_multiplier = if platform.isa.word_size == 32 {
+        4u64
+    } else {
+        8
+    };
     let instructions_per_node = 10u64; // heuristic
     let estimated_code_bytes = graph.node_count() as u64 * instructions_per_node * code_multiplier;
 
@@ -248,10 +252,7 @@ pub fn estimate_layout(
 }
 
 /// Compute peak stack usage as the heaviest path (in frame bytes) through the graph.
-fn compute_peak_stack(
-    graph: &Graph,
-    frame_map: &std::collections::HashMap<NodeId, u64>,
-) -> u64 {
+fn compute_peak_stack(graph: &Graph, frame_map: &std::collections::HashMap<NodeId, u64>) -> u64 {
     // Use topological order and dynamic programming to find heaviest path
     let sorted = match graph.topological_sort() {
         Ok(s) => s,
@@ -359,7 +360,9 @@ mod tests {
             &platform
         )
         .is_none());
-        assert!(estimate_type_size(&Type::Distribution(Box::new(Type::f32())), &platform).is_none());
+        assert!(
+            estimate_type_size(&Type::Distribution(Box::new(Type::f32())), &platform).is_none()
+        );
     }
 
     #[test]

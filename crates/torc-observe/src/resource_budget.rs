@@ -26,19 +26,15 @@ impl View for ResourceBudgetView {
         let report = if let Some(report) = ctx.resource_report {
             report.clone()
         } else {
-            let layout = estimate_layout(graph, platform).map_err(|e| {
-                ObserveError::GraphError {
+            let layout =
+                estimate_layout(graph, platform).map_err(|e| ObserveError::GraphError {
                     message: format!("layout estimation failed: {e}"),
-                }
-            })?;
+                })?;
             check_resource_fit(&layout, platform)
         };
 
         let mut text = String::new();
-        text.push_str(&format!(
-            "=== Resource Budget ({}) ===\n\n",
-            platform.name
-        ));
+        text.push_str(&format!("=== Resource Budget ({}) ===\n\n", platform.name));
 
         // MEMORY section
         text.push_str("MEMORY\n");
@@ -174,9 +170,7 @@ mod tests {
         let ctx = RenderContext::empty();
         let result = view.render(&g, &ctx);
         assert!(result.is_err());
-        assert!(
-            matches!(result.unwrap_err(), ObserveError::NoPlatform)
-        );
+        assert!(matches!(result.unwrap_err(), ObserveError::NoPlatform));
     }
 
     #[test]
@@ -199,8 +193,8 @@ mod tests {
     #[test]
     fn bar_chart_rendering() {
         let mut g = Graph::new();
-        let n = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32()));
+        let n =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
         g.add_node(n).unwrap();
 
         let view = ResourceBudgetView;
@@ -243,8 +237,8 @@ mod tests {
     #[test]
     fn auto_estimation_json() {
         let mut g = Graph::new();
-        let n = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32()));
+        let n =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
         g.add_node(n).unwrap();
 
         let view = ResourceBudgetView;

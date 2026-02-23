@@ -30,11 +30,10 @@ pub fn verify_binary(
     artifact_path: &Path,
     predicted_code_bytes: u64,
 ) -> Result<PostVerifyResult, MaterializationError> {
-    let metadata = std::fs::metadata(artifact_path).map_err(|e| {
-        MaterializationError::PostVerifyFailed {
+    let metadata =
+        std::fs::metadata(artifact_path).map_err(|e| MaterializationError::PostVerifyFailed {
             reason: format!("cannot read artifact at {}: {e}", artifact_path.display()),
-        }
-    })?;
+        })?;
 
     let code_size_bytes = metadata.len();
 

@@ -105,7 +105,12 @@ impl View for ContractView {
             .max()
             .unwrap_or(10)
             .max(10);
-        let eff_w = rows.iter().map(|r| r.effects.len()).max().unwrap_or(7).max(7);
+        let eff_w = rows
+            .iter()
+            .map(|r| r.effects.len())
+            .max()
+            .unwrap_or(7)
+            .max(7);
         let bounds_w = rows
             .iter()
             .map(|r| {
@@ -374,9 +379,10 @@ mod tests {
         let mut g = Graph::new();
         let mut n = Node::new(NodeKind::Literal)
             .with_type_signature(TypeSignature::source(Type::i32()))
-            .with_contract(Contract::pure_default().with_effects(
-                EffectSet::from_effects(vec![Effect::IO("UART".into())]),
-            ));
+            .with_contract(
+                Contract::pure_default()
+                    .with_effects(EffectSet::from_effects(vec![Effect::IO("UART".into())])),
+            );
         n.annotations.insert("name".into(), "uart_write".into());
         g.add_node(n).unwrap();
 
@@ -408,15 +414,15 @@ mod tests {
         let view = ContractView;
         let output = view.render(&g, &empty_ctx()).unwrap();
         // Table lines should all have the same length (no overflow from joined predicates)
-        let table_lines: Vec<&str> = output
-            .text
-            .lines()
-            .filter(|l| l.starts_with('│'))
-            .collect();
+        let table_lines: Vec<&str> = output.text.lines().filter(|l| l.starts_with('│')).collect();
         assert!(!table_lines.is_empty());
         let first_len = table_lines[0].len();
         for line in &table_lines {
-            assert_eq!(line.len(), first_len, "Table row has inconsistent width: {line}");
+            assert_eq!(
+                line.len(),
+                first_len,
+                "Table row has inconsistent width: {line}"
+            );
         }
     }
 

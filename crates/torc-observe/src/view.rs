@@ -80,8 +80,9 @@ impl ViewOutput {
     pub fn render(&self, format: ViewFormat) -> String {
         match format {
             ViewFormat::Text => self.text.clone(),
-            ViewFormat::Json => serde_json::to_string_pretty(&self.data)
-                .unwrap_or_else(|_| "{}".to_string()),
+            ViewFormat::Json => {
+                serde_json::to_string_pretty(&self.data).unwrap_or_else(|_| "{}".to_string())
+            }
         }
     }
 }
@@ -137,12 +138,21 @@ mod tests {
 
     #[test]
     fn parse_view_kinds() {
-        assert_eq!(ViewKind::parse("pseudo-code").unwrap(), ViewKind::PseudoCode);
+        assert_eq!(
+            ViewKind::parse("pseudo-code").unwrap(),
+            ViewKind::PseudoCode
+        );
         assert_eq!(ViewKind::parse("pseudocode").unwrap(), ViewKind::PseudoCode);
         assert_eq!(ViewKind::parse("contracts").unwrap(), ViewKind::Contract);
         assert_eq!(ViewKind::parse("contract").unwrap(), ViewKind::Contract);
-        assert_eq!(ViewKind::parse("resources").unwrap(), ViewKind::ResourceBudget);
-        assert_eq!(ViewKind::parse("resource-budget").unwrap(), ViewKind::ResourceBudget);
+        assert_eq!(
+            ViewKind::parse("resources").unwrap(),
+            ViewKind::ResourceBudget
+        );
+        assert_eq!(
+            ViewKind::parse("resource-budget").unwrap(),
+            ViewKind::ResourceBudget
+        );
         assert_eq!(ViewKind::parse("dataflow").unwrap(), ViewKind::Dataflow);
         assert_eq!(ViewKind::parse("provenance").unwrap(), ViewKind::Provenance);
         assert_eq!(ViewKind::parse("decision").unwrap(), ViewKind::Decision);

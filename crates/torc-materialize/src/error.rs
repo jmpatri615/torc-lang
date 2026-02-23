@@ -1,7 +1,7 @@
 //! Materialization errors.
 
-use torc_core::graph::GraphError;
 use thiserror::Error;
+use torc_core::graph::GraphError;
 
 /// Errors that can occur during the materialization pipeline.
 #[derive(Debug, Error)]

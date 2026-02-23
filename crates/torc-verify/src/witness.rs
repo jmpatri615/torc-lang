@@ -7,7 +7,11 @@ use torc_core::contract::{ProofObligation, ProofWitness};
 ///
 /// Creates a `ProofWitness` whose hash is the SHA-256 of the obligation
 /// predicate (debug-printed) concatenated with the solver name.
-pub fn generate_witness(solver_name: &str, obligation: &ProofObligation, data: Vec<u8>) -> ProofWitness {
+pub fn generate_witness(
+    solver_name: &str,
+    obligation: &ProofObligation,
+    data: Vec<u8>,
+) -> ProofWitness {
     let hash = compute_witness_hash(solver_name, obligation);
     ProofWitness {
         hash,

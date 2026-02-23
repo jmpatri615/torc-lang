@@ -48,7 +48,10 @@ impl View for ProvenanceView {
         for (name, kind, node_id, prov) in &entries {
             let short_id = &node_id.to_string()[..8];
             text.push_str(&format!("{name} [{kind}] (uuid: {short_id}...)\n"));
-            text.push_str(&format!("  Created: {} by {}\n", prov.created, prov.created_by));
+            text.push_str(&format!(
+                "  Created: {} by {}\n",
+                prov.created, prov.created_by
+            ));
             text.push_str(&format!("  Reason:  {}\n", prov.creation_reason));
 
             if !prov.requirements.is_empty() {
@@ -154,14 +157,12 @@ mod tests {
     #[test]
     fn ai_author() {
         let mut g = Graph::new();
-        let mut n = Node::new(NodeKind::Literal).with_provenance(
-            Provenance::ai_authored(
-                "claude-4.5-opus",
-                "anthropic",
-                "20260215",
-                "Implement sensor reading",
-            ),
-        );
+        let mut n = Node::new(NodeKind::Literal).with_provenance(Provenance::ai_authored(
+            "claude-4.5-opus",
+            "anthropic",
+            "20260215",
+            "Implement sensor reading",
+        ));
         n.annotations.insert("name".into(), "sensor".into());
         g.add_node(n).unwrap();
 
@@ -205,12 +206,8 @@ mod tests {
     #[test]
     fn requirement_links() {
         let mut g = Graph::new();
-        let mut prov = Provenance::ai_authored(
-            "claude-4.5-opus",
-            "anthropic",
-            "20260215",
-            "Motor control",
-        );
+        let mut prov =
+            Provenance::ai_authored("claude-4.5-opus", "anthropic", "20260215", "Motor control");
         prov.link_requirement(
             "REQ-CTRL-001",
             Some("requirements.md"),

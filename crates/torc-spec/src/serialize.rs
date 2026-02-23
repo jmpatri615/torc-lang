@@ -39,8 +39,8 @@ impl TdgFile {
 
     /// Serialize to bytes.
     pub fn to_bytes(&self) -> Result<Vec<u8>, SpecError> {
-        let json = serde_json::to_vec(&self.graph)
-            .map_err(|e| SpecError::Serialization(e.to_string()))?;
+        let json =
+            serde_json::to_vec(&self.graph).map_err(|e| SpecError::Serialization(e.to_string()))?;
 
         let decision_count = self.graph.decision_count() as u32;
         let assumption_count = self.graph.assumption_count() as u32;

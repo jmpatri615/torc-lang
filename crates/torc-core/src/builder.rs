@@ -312,11 +312,7 @@ impl GraphBuilder {
     }
 
     /// Add an interface port to a region.
-    pub fn add_region_port(
-        &mut self,
-        region_id: RegionId,
-        port: Port,
-    ) -> Result<(), GraphError> {
+    pub fn add_region_port(&mut self, region_id: RegionId, port: Port) -> Result<(), GraphError> {
         let region = self
             .graph
             .get_region_mut(&region_id)
@@ -648,8 +644,8 @@ mod tests {
         let gpio_write = b.add_write("gpio_fault_pin");
 
         // Set IO effect contract on write node
-        let io_contract = Contract::pure_default()
-            .with_effects(EffectSet::from_effects(vec![Effect::IO(
+        let io_contract =
+            Contract::pure_default().with_effects(EffectSet::from_effects(vec![Effect::IO(
                 "GPIO_FAULT_PIN".into(),
             )]));
         b.set_contract(gpio_write, io_contract).unwrap();

@@ -136,10 +136,7 @@ impl VerificationReport {
                     diagnostics.push(Diagnostic {
                         obligation_id: tracked.id,
                         severity: Severity::Info,
-                        message: format!(
-                            "obligation waived: {}",
-                            tracked.obligation.description
-                        ),
+                        message: format!("obligation waived: {}", tracked.obligation.description),
                         context: format!("{:?}", tracked.obligation.kind),
                         counterexample: None,
                         suggestions: vec![],
@@ -269,12 +266,8 @@ mod tests {
         }
 
         let cache_stats = CacheStats::default();
-        let report = VerificationReport::build(
-            &registry,
-            &cache_stats,
-            ProfileLevel::Development,
-            &[],
-        );
+        let report =
+            VerificationReport::build(&registry, &cache_stats, ProfileLevel::Development, &[]);
 
         assert_eq!(report.summary.total, registry.len());
         assert_eq!(report.summary.verified, 1);
@@ -287,12 +280,8 @@ mod tests {
         let g = make_graph_with_obligations();
         let registry = crate::registry::ObligationRegistry::collect_from_graph(&g);
         let cache_stats = CacheStats::default();
-        let report = VerificationReport::build(
-            &registry,
-            &cache_stats,
-            ProfileLevel::Development,
-            &[],
-        );
+        let report =
+            VerificationReport::build(&registry, &cache_stats, ProfileLevel::Development, &[]);
 
         let output = format!("{report}");
         assert!(output.contains("Verification Report"));

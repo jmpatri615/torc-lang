@@ -317,14 +317,8 @@ impl Graph {
         // Copy edges where both endpoints are in the set
         for edge in self.edges.values() {
             if node_ids.contains(&edge.source.0) && node_ids.contains(&edge.target.0) {
-                sub.outgoing
-                    .entry(edge.source.0)
-                    .or_default()
-                    .push(edge.id);
-                sub.incoming
-                    .entry(edge.target.0)
-                    .or_default()
-                    .push(edge.id);
+                sub.outgoing.entry(edge.source.0).or_default().push(edge.id);
+                sub.incoming.entry(edge.target.0).or_default().push(edge.id);
                 sub.edges.insert(edge.id, edge.clone());
             }
         }
@@ -834,7 +828,10 @@ impl Graph {
             self.incoming.entry(*id).or_default().extend(edges);
         }
         for (id, children) in &other.region_children {
-            self.region_children.entry(*id).or_default().extend(children);
+            self.region_children
+                .entry(*id)
+                .or_default()
+                .extend(children);
         }
         for (node_id, region_id) in &other.node_region {
             self.node_region.insert(*node_id, *region_id);
@@ -1098,12 +1095,12 @@ impl Graph {
             match (src_in, tgt_in) {
                 (true, false) => {
                     // Source is internal, target is external
-                    let new_ep = port_map
-                        .get(&(edge.source.0, edge.source.1))
-                        .ok_or(GraphError::UnmappedBoundaryPort {
+                    let new_ep = port_map.get(&(edge.source.0, edge.source.1)).ok_or(
+                        GraphError::UnmappedBoundaryPort {
                             node: edge.source.0,
                             port: edge.source.1,
-                        })?;
+                        },
+                    )?;
                     descriptors.push(BoundaryDescriptor {
                         external_endpoint: edge.target,
                         internal_is_source: true,
@@ -1115,12 +1112,12 @@ impl Graph {
                 }
                 (false, true) => {
                     // Target is internal, source is external
-                    let new_ep = port_map
-                        .get(&(edge.target.0, edge.target.1))
-                        .ok_or(GraphError::UnmappedBoundaryPort {
+                    let new_ep = port_map.get(&(edge.target.0, edge.target.1)).ok_or(
+                        GraphError::UnmappedBoundaryPort {
                             node: edge.target.0,
                             port: edge.target.1,
-                        })?;
+                        },
+                    )?;
                     descriptors.push(BoundaryDescriptor {
                         external_endpoint: edge.source,
                         internal_is_source: false,
@@ -1458,13 +1455,11 @@ mod tests {
         use crate::types::{Type, TypeSignature};
 
         let mut g = Graph::new();
-        let n1 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32()));
-        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
-            .with_type_signature(TypeSignature::pure_fn(
-                vec![Type::i32(), Type::i32()],
-                Type::i32(),
-            ));
+        let n1 =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
+        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add)).with_type_signature(
+            TypeSignature::pure_fn(vec![Type::i32(), Type::i32()], Type::i32()),
+        );
         let id1 = n1.id;
         let id2 = n2.id;
         g.add_node(n1).unwrap();
@@ -1480,13 +1475,11 @@ mod tests {
         use crate::types::{Type, TypeSignature};
 
         let mut g = Graph::new();
-        let n1 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32()));
-        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
-            .with_type_signature(TypeSignature::pure_fn(
-                vec![Type::i32(), Type::i32()],
-                Type::i32(),
-            ));
+        let n1 =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
+        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add)).with_type_signature(
+            TypeSignature::pure_fn(vec![Type::i32(), Type::i32()], Type::i32()),
+        );
         let id1 = n1.id;
         let id2 = n2.id;
         g.add_node(n1).unwrap();
@@ -1497,7 +1490,9 @@ mod tests {
         let result = g.validate_port_types();
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(errors.iter().any(|e| matches!(e, GraphError::PortOutOfRange { node, port } if *node == id1 && *port == 5)));
+        assert!(errors.iter().any(
+            |e| matches!(e, GraphError::PortOutOfRange { node, port } if *node == id1 && *port == 5)
+        ));
     }
 
     #[test]
@@ -1627,8 +1622,9 @@ mod tests {
         use crate::types::{Linearity, Type, TypeSignature};
 
         let mut g = Graph::new();
-        let n1 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32().with_linearity(Linearity::Linear)));
+        let n1 = Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(
+            Type::i32().with_linearity(Linearity::Linear),
+        ));
         let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
             .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
         let id1 = n1.id;
@@ -1647,14 +1643,17 @@ mod tests {
 
         let mut g = Graph::new();
         // Linear value with no consumers: violation (must be used exactly once)
-        let n1 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32().with_linearity(Linearity::Linear)));
+        let n1 = Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(
+            Type::i32().with_linearity(Linearity::Linear),
+        ));
         g.add_node(n1).unwrap();
 
         let result = g.validate_linearity();
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(errors.iter().any(|e| matches!(e, GraphError::LinearityViolation { consumers: 0, .. })));
+        assert!(errors
+            .iter()
+            .any(|e| matches!(e, GraphError::LinearityViolation { consumers: 0, .. })));
     }
 
     #[test]
@@ -1662,8 +1661,9 @@ mod tests {
         use crate::types::{Linearity, Type, TypeSignature};
 
         let mut g = Graph::new();
-        let n1 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32().with_linearity(Linearity::Linear)));
+        let n1 = Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(
+            Type::i32().with_linearity(Linearity::Linear),
+        ));
         let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
             .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
         let n3 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Mul))
@@ -1681,7 +1681,9 @@ mod tests {
         let result = g.validate_linearity();
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(errors.iter().any(|e| matches!(e, GraphError::LinearityViolation { consumers: 2, .. })));
+        assert!(errors
+            .iter()
+            .any(|e| matches!(e, GraphError::LinearityViolation { consumers: 2, .. })));
     }
 
     #[test]
@@ -1689,8 +1691,9 @@ mod tests {
         use crate::types::{Linearity, Type, TypeSignature};
 
         let mut g = Graph::new();
-        let n1 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32().with_linearity(Linearity::Affine)));
+        let n1 = Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(
+            Type::i32().with_linearity(Linearity::Affine),
+        ));
         g.add_node(n1).unwrap();
 
         // Affine with 0 consumers: OK (may be dropped)
@@ -1702,8 +1705,9 @@ mod tests {
         use crate::types::{Linearity, Type, TypeSignature};
 
         let mut g = Graph::new();
-        let n1 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32().with_linearity(Linearity::Affine)));
+        let n1 = Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(
+            Type::i32().with_linearity(Linearity::Affine),
+        ));
         let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
             .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
         let n3 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Mul))
@@ -1773,7 +1777,9 @@ mod tests {
         let result = g.validate_effects();
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(errors.iter().any(|e| matches!(e, GraphError::EffectViolation { .. })));
+        assert!(errors
+            .iter()
+            .any(|e| matches!(e, GraphError::EffectViolation { .. })));
     }
 
     #[test]
@@ -1781,10 +1787,11 @@ mod tests {
         use crate::types::{Type, TypeSignature};
 
         let mut g = Graph::new();
-        let n1 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32()));
-        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
-            .with_type_signature(TypeSignature::pure_fn(vec![Type::i32(), Type::i32()], Type::i32()));
+        let n1 =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
+        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add)).with_type_signature(
+            TypeSignature::pure_fn(vec![Type::i32(), Type::i32()], Type::i32()),
+        );
         let id1 = n1.id;
         let id2 = n2.id;
         g.add_node(n1).unwrap();
@@ -1802,8 +1809,8 @@ mod tests {
 
         let mut g = Graph::new();
         // Source outputs f64
-        let n1 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::f64()));
+        let n1 =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::f64()));
         // Target expects i32 input
         let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
             .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
@@ -1816,7 +1823,9 @@ mod tests {
         let result = g.validate_edge_types();
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(errors.iter().any(|e| matches!(e, GraphError::TypeMismatch { .. })));
+        assert!(errors
+            .iter()
+            .any(|e| matches!(e, GraphError::TypeMismatch { .. })));
     }
 
     #[test]
@@ -1824,10 +1833,11 @@ mod tests {
         use crate::types::{Type, TypeSignature};
 
         let mut g = Graph::new();
-        let n1 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32()));
-        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add))
-            .with_type_signature(TypeSignature::pure_fn(vec![Type::i32(), Type::i32()], Type::i32()));
+        let n1 =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
+        let n2 = Node::new(NodeKind::Arithmetic(node::ArithmeticOp::Add)).with_type_signature(
+            TypeSignature::pure_fn(vec![Type::i32(), Type::i32()], Type::i32()),
+        );
         let id1 = n1.id;
         let id2 = n2.id;
         g.add_node(n1).unwrap();
@@ -2070,9 +2080,7 @@ mod tests {
         g2.add_edge(dup_edge).unwrap();
 
         let err = g1.merge(&g2).unwrap_err();
-        assert!(
-            matches!(err, GraphError::MergeConflict { ref kind, .. } if kind == "edge")
-        );
+        assert!(matches!(err, GraphError::MergeConflict { ref kind, .. } if kind == "edge"));
     }
 
     #[test]
@@ -2093,9 +2101,7 @@ mod tests {
         g2.add_region(r2).unwrap();
 
         let err = g1.merge(&g2).unwrap_err();
-        assert!(
-            matches!(err, GraphError::MergeConflict { ref kind, .. } if kind == "region")
-        );
+        assert!(matches!(err, GraphError::MergeConflict { ref kind, .. } if kind == "region"));
     }
 
     #[test]
@@ -2438,10 +2444,10 @@ mod tests {
         let old_nodes: HashSet<NodeId> = [id2].into_iter().collect();
         let mut port_map = HashMap::new();
         port_map.insert((id2, 0), (new_id, 0)); // output boundary
-        // Also need to map the input boundary: (id2, 0) as target
-        // But the input edge is (id1,0)->(id2,0), so internal endpoint is (id2,0)
-        // Both boundary edges reference (id2, 0) — one as source, one as target
-        // port_map already has (id2, 0) -> (new_id, 0)
+                                                // Also need to map the input boundary: (id2, 0) as target
+                                                // But the input edge is (id1,0)->(id2,0), so internal endpoint is (id2,0)
+                                                // Both boundary edges reference (id2, 0) — one as source, one as target
+                                                // port_map already has (id2, 0) -> (new_id, 0)
 
         g.replace_subgraph(&old_nodes, &replacement, &port_map)
             .unwrap();

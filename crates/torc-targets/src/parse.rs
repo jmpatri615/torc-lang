@@ -44,9 +44,7 @@ pub fn platform_to_toml(platform: &Platform) -> Result<String> {
 /// Validate a platform definition for structural correctness.
 ///
 /// Returns `Ok(())` if valid, or `Err(issues)` with a list of problems.
-pub fn validate_platform(
-    platform: &Platform,
-) -> std::result::Result<(), Vec<ValidationIssue>> {
+pub fn validate_platform(platform: &Platform) -> std::result::Result<(), Vec<ValidationIssue>> {
     let mut issues = Vec::new();
 
     // 1. ISA word size is power of 2 (8/16/32/64/128)
@@ -202,10 +200,7 @@ pub fn discover_targets(project_dir: &Path) -> Result<Vec<(String, PathBuf)>> {
         let path = entry.path();
         if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
             if file_name.ends_with(".target.toml") {
-                let name = file_name
-                    .strip_suffix(".target.toml")
-                    .unwrap()
-                    .to_string();
+                let name = file_name.strip_suffix(".target.toml").unwrap().to_string();
                 targets.push((name, path));
             }
         }

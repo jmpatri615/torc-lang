@@ -23,17 +23,13 @@ pub(crate) fn create_project(project_dir: &Path, name: &str) -> Result<()> {
     }
 
     // Create directory structure
-    fs::create_dir_all(project_dir.join("graph"))
-        .context("creating graph/ directory")?;
-    fs::create_dir_all(project_dir.join("targets"))
-        .context("creating targets/ directory")?;
-    fs::create_dir_all(project_dir.join("out"))
-        .context("creating out/ directory")?;
+    fs::create_dir_all(project_dir.join("graph")).context("creating graph/ directory")?;
+    fs::create_dir_all(project_dir.join("targets")).context("creating targets/ directory")?;
+    fs::create_dir_all(project_dir.join("out")).context("creating out/ directory")?;
 
     // Generate torc.toml
     let manifest_content = TorcManifest::template(name);
-    fs::write(project_dir.join("torc.toml"), &manifest_content)
-        .context("writing torc.toml")?;
+    fs::write(project_dir.join("torc.toml"), &manifest_content).context("writing torc.toml")?;
 
     // Generate graph/main.trc — empty graph
     let graph = Graph::new();
@@ -43,8 +39,7 @@ pub(crate) fn create_project(project_dir: &Path, name: &str) -> Result<()> {
         .context("writing graph/main.trc")?;
 
     // Generate .gitignore
-    fs::write(project_dir.join(".gitignore"), "out/\n")
-        .context("writing .gitignore")?;
+    fs::write(project_dir.join(".gitignore"), "out/\n").context("writing .gitignore")?;
 
     println!("Created project '{name}'");
     println!("  {name}/torc.toml");
@@ -106,8 +101,6 @@ mod tests {
 
         let result = create_project(&project_path, "existing");
         assert!(result.is_err());
-        assert!(
-            result.unwrap_err().to_string().contains("already exists")
-        );
+        assert!(result.unwrap_err().to_string().contains("already exists"));
     }
 }

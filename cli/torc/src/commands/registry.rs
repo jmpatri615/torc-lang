@@ -11,7 +11,12 @@ use crate::manifest::TorcManifest;
 ///
 /// Resolves the module against the local registry (or cache) and adds it
 /// to the project's `[dependencies]` in `torc.toml`.
-pub fn add(project_dir: &Path, manifest: &TorcManifest, name: &str, version: Option<&str>) -> Result<()> {
+pub fn add(
+    project_dir: &Path,
+    manifest: &TorcManifest,
+    name: &str,
+    version: Option<&str>,
+) -> Result<()> {
     let manifest_path = project_dir.join("torc.toml");
     if !manifest_path.is_file() {
         bail!("no torc.toml found in {}", project_dir.display());

@@ -11,16 +11,12 @@
 //! └── torc-hal v0.6.2
 //! ```
 
-use crate::resolution::{ResolvedDep, ResolutionResult};
+use crate::resolution::{ResolutionResult, ResolvedDep};
 
 /// Format a dependency tree as a human-readable string.
 ///
 /// `root_name` and `root_version` are the project's own name/version.
-pub fn format_tree(
-    root_name: &str,
-    root_version: &str,
-    resolution: &ResolutionResult,
-) -> String {
+pub fn format_tree(root_name: &str, root_version: &str, resolution: &ResolutionResult) -> String {
     let mut out = format!("{root_name} v{root_version}\n");
 
     let count = resolution.tree.len();
@@ -88,7 +84,7 @@ pub fn format_lock(resolution: &ResolutionResult) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::resolution::{LockEntry, ResolvedDep, ResolutionResult};
+    use crate::resolution::{LockEntry, ResolutionResult, ResolvedDep};
 
     #[test]
     fn format_simple_tree() {

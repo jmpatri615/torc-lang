@@ -19,9 +19,11 @@ impl View for DataflowView {
     }
 
     fn render(&self, graph: &Graph, _ctx: &RenderContext<'_>) -> Result<ViewOutput, ObserveError> {
-        let sorted = graph.topological_sort().map_err(|e| ObserveError::GraphError {
-            message: format!("topological sort failed: {e}"),
-        })?;
+        let sorted = graph
+            .topological_sort()
+            .map_err(|e| ObserveError::GraphError {
+                message: format!("topological sort failed: {e}"),
+            })?;
 
         if sorted.is_empty() {
             return Ok(ViewOutput {
@@ -205,8 +207,8 @@ mod tests {
     #[test]
     fn diamond_parallelism() {
         let mut g = Graph::new();
-        let mut src = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32()));
+        let mut src =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
         src.annotations.insert("name".into(), "src".into());
 
         let mut left = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add))
@@ -217,11 +219,9 @@ mod tests {
             .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
         right.annotations.insert("name".into(), "right".into());
 
-        let mut join = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add))
-            .with_type_signature(TypeSignature::new(
-                vec![Type::i32(), Type::i32()],
-                vec![Type::i32()],
-            ));
+        let mut join = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add)).with_type_signature(
+            TypeSignature::new(vec![Type::i32(), Type::i32()], vec![Type::i32()]),
+        );
         join.annotations.insert("name".into(), "join".into());
 
         let s = g.add_node(src).unwrap();
@@ -229,10 +229,14 @@ mod tests {
         let r = g.add_node(right).unwrap();
         let j = g.add_node(join).unwrap();
 
-        g.add_edge(Edge::typed((s, 0), (l, 0), Type::i32())).unwrap();
-        g.add_edge(Edge::typed((s, 0), (r, 0), Type::i32())).unwrap();
-        g.add_edge(Edge::typed((l, 0), (j, 0), Type::i32())).unwrap();
-        g.add_edge(Edge::typed((r, 0), (j, 1), Type::i32())).unwrap();
+        g.add_edge(Edge::typed((s, 0), (l, 0), Type::i32()))
+            .unwrap();
+        g.add_edge(Edge::typed((s, 0), (r, 0), Type::i32()))
+            .unwrap();
+        g.add_edge(Edge::typed((l, 0), (j, 0), Type::i32()))
+            .unwrap();
+        g.add_edge(Edge::typed((r, 0), (j, 1), Type::i32()))
+            .unwrap();
 
         let view = DataflowView;
         let output = view.render(&g, &empty_ctx()).unwrap();
@@ -253,8 +257,8 @@ mod tests {
     #[test]
     fn linear_chain_depth() {
         let mut g = Graph::new();
-        let n1 = Node::new(NodeKind::Literal)
-            .with_type_signature(TypeSignature::source(Type::i32()));
+        let n1 =
+            Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
         let n2 = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add))
             .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
         let n3 = Node::new(NodeKind::Arithmetic(ArithmeticOp::Mul))
@@ -264,8 +268,10 @@ mod tests {
         let id2 = g.add_node(n2).unwrap();
         let id3 = g.add_node(n3).unwrap();
 
-        g.add_edge(Edge::typed((id1, 0), (id2, 0), Type::i32())).unwrap();
-        g.add_edge(Edge::typed((id2, 0), (id3, 0), Type::i32())).unwrap();
+        g.add_edge(Edge::typed((id1, 0), (id2, 0), Type::i32()))
+            .unwrap();
+        g.add_edge(Edge::typed((id2, 0), (id3, 0), Type::i32()))
+            .unwrap();
 
         let view = DataflowView;
         let output = view.render(&g, &empty_ctx()).unwrap();
@@ -292,11 +298,9 @@ mod tests {
     #[test]
     fn type_info_display() {
         let mut g = Graph::new();
-        let mut n = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add))
-            .with_type_signature(TypeSignature::pure_fn(
-                vec![Type::i32(), Type::i32()],
-                Type::i32(),
-            ));
+        let mut n = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add)).with_type_signature(
+            TypeSignature::pure_fn(vec![Type::i32(), Type::i32()], Type::i32()),
+        );
         n.annotations.insert("name".into(), "sum".into());
         g.add_node(n).unwrap();
 

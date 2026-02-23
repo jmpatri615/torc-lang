@@ -19,7 +19,7 @@ pub use error::{Result, TargetError};
 pub use isa::{CallingConvention, Endianness, IsaModel, RegisterClass};
 pub use microarch::{MemoryTiming, MicroarchModel, PipelineModel};
 pub use parse::{
-    discover_targets, generate_template, load_platform_toml, parse_platform_toml,
-    platform_to_toml, validate_platform, ValidationIssue,
+    discover_targets, generate_template, load_platform_toml, parse_platform_toml, platform_to_toml,
+    validate_platform, ValidationIssue,
 };
 pub use platform::{Platform, ResourceConstraints};

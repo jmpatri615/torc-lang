@@ -63,9 +63,7 @@ pub fn decision_aware_profile(
 ///
 /// - Conflicted decisions → Error (must resolve before build)
 /// - Unexplored safety-domain decisions → Warning
-pub fn check_materialization_readiness(
-    graph: &DecisionGraph,
-) -> Result<(), Vec<ReadinessIssue>> {
+pub fn check_materialization_readiness(graph: &DecisionGraph) -> Result<(), Vec<ReadinessIssue>> {
     let mut issues = Vec::new();
 
     for decision in graph.decisions() {

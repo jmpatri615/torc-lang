@@ -49,9 +49,7 @@ impl TrustPolicy {
         // Check require_audited: reject anything less trusted than audited (i.e., only unsafe).
         // Platform (level 1) and verified (level 0) are more trusted than audited (level 2),
         // so they pass this check.
-        if self.require_audited
-            && func.trust_level.level() > TrustLevel::Audited.level()
-        {
+        if self.require_audited && func.trust_level.level() > TrustLevel::Audited.level() {
             return Err(FfiError::TrustPolicyViolation {
                 detail: format!(
                     "function '{}' has trust level '{}' but policy requires at least 'audited'",

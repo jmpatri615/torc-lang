@@ -127,10 +127,7 @@ impl ImpactReport {
 ///
 /// This is a conservative analysis based on dependency structure and
 /// revisit triggers. Domain-specific impact analysis is deferred.
-pub fn analyze_commit_impact(
-    graph: &DecisionGraph,
-    decision: &Decision,
-) -> ImpactReport {
+pub fn analyze_commit_impact(graph: &DecisionGraph, decision: &Decision) -> ImpactReport {
     let mut report = ImpactReport::new(decision.id, decision.value.clone());
 
     // Find decisions that depend on the committed decision

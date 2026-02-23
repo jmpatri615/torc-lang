@@ -46,8 +46,8 @@ pub fn describe(name: &str, project_dir: Option<&Path>, format: Option<&str>) ->
 
     // TOML output mode
     if format == Some("toml") {
-        let toml_str = torc_targets::platform_to_toml(&platform)
-            .map_err(|e| anyhow::anyhow!("{e}"))?;
+        let toml_str =
+            torc_targets::platform_to_toml(&platform).map_err(|e| anyhow::anyhow!("{e}"))?;
         print!("{toml_str}");
         return Ok(());
     }
@@ -66,19 +66,13 @@ pub fn describe(name: &str, project_dir: Option<&Path>, format: Option<&str>) ->
     }
     println!("  Registers:");
     for reg in &platform.isa.register_classes {
-        println!(
-            "    {}: {} x {} bits",
-            reg.name, reg.count, reg.width_bits
-        );
+        println!("    {}: {} x {} bits", reg.name, reg.count, reg.width_bits);
     }
     println!();
 
     println!("--- Microarchitecture ---");
     println!("  Name:     {}", platform.microarch.name);
-    println!(
-        "  Pipeline: {} stages",
-        platform.microarch.pipeline.stages
-    );
+    println!("  Pipeline: {} stages", platform.microarch.pipeline.stages);
     println!();
 
     println!("--- Environment ---");
@@ -124,8 +118,7 @@ pub fn add(name: &str, project_dir: &Path) -> Result<()> {
         );
     }
 
-    let template = torc_targets::generate_template(name)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let template = torc_targets::generate_template(name).map_err(|e| anyhow::anyhow!("{e}"))?;
     std::fs::write(&target_path, &template)?;
 
     println!("Created target: {}", target_path.display());
@@ -153,10 +146,7 @@ pub fn validate(name: &str, project_dir: Option<&Path>) -> Result<()> {
                 println!("{}: {}", issue.severity, issue.message);
             }
             println!();
-            println!(
-                "{} error(s), {} warning(s)",
-                error_count, warning_count
-            );
+            println!("{} error(s), {} warning(s)", error_count, warning_count);
 
             if error_count > 0 {
                 bail!("target '{name}' has validation errors");
@@ -201,10 +191,9 @@ mod tests {
         assert!(dir.path().join("targets/my-board.target.toml").is_file());
 
         // Verify it's valid TOML that parses to a Platform
-        let platform = torc_targets::load_platform_toml(
-            &dir.path().join("targets/my-board.target.toml"),
-        )
-        .unwrap();
+        let platform =
+            torc_targets::load_platform_toml(&dir.path().join("targets/my-board.target.toml"))
+                .unwrap();
         assert_eq!(platform.name, "my-board");
     }
 

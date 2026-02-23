@@ -111,20 +111,20 @@ pub fn emit_code(
     build_function(graph, &mut cg_ctx)?;
 
     // Lower all nodes in topological order
-    let sorted = graph.topological_sort().map_err(|e| {
-        MaterializationError::CodegenFailed {
+    let sorted = graph
+        .topological_sort()
+        .map_err(|e| MaterializationError::CodegenFailed {
             stage: "emit_code".into(),
             message: format!("topological sort failed: {e}"),
-        }
-    })?;
+        })?;
 
     for &node_id in &sorted {
-        let node = graph.get_node(&node_id).ok_or_else(|| {
-            MaterializationError::CodegenFailed {
+        let node = graph
+            .get_node(&node_id)
+            .ok_or_else(|| MaterializationError::CodegenFailed {
                 stage: "emit_code".into(),
                 message: format!("node {node_id} not found during lowering"),
-            }
-        })?;
+            })?;
         lower::lower_node(node, graph, &mut cg_ctx)?;
     }
 
@@ -132,12 +132,13 @@ pub fn emit_code(
     build_return(graph, &sorted, &cg_ctx)?;
 
     // Verify the module
-    cg_ctx.module().verify().map_err(|e| {
-        MaterializationError::CodegenFailed {
+    cg_ctx
+        .module()
+        .verify()
+        .map_err(|e| MaterializationError::CodegenFailed {
             stage: "verify_module".into(),
             message: format!("LLVM module verification failed: {e}"),
-        }
-    })?;
+        })?;
 
     // Emit artifacts based on config
     let (obj_path, exe_path, ir_path, bc_path) =
@@ -146,11 +147,9 @@ pub fn emit_code(
     match config.target {
         EmitTarget::LlvmIr => {
             let ir = emit_llvm_ir(cg_ctx.module());
-            std::fs::write(&ir_path, &ir).map_err(|e| {
-                MaterializationError::CodegenFailed {
-                    stage: "emit_ir".into(),
-                    message: format!("failed to write IR file: {e}"),
-                }
+            std::fs::write(&ir_path, &ir).map_err(|e| MaterializationError::CodegenFailed {
+                stage: "emit_ir".into(),
+                message: format!("failed to write IR file: {e}"),
             })?;
             let size = ir.len() as u64;
             Ok(CodegenOutput {
@@ -171,8 +170,7 @@ pub fn emit_code(
             })
         }
         EmitTarget::ObjectFile => {
-            let size =
-                emit_object(cg_ctx.module(), triple, cpu, "", opt_level, &obj_path)?;
+            let size = emit_object(cg_ctx.module(), triple, cpu, "", opt_level, &obj_path)?;
             Ok(CodegenOutput {
                 object_path: Some(obj_path),
                 executable_path: None,
@@ -181,10 +179,11 @@ pub fn emit_code(
             })
         }
         EmitTarget::Executable => {
-            let size =
-                emit_object(cg_ctx.module(), triple, cpu, "", opt_level, &obj_path)?;
+            let size = emit_object(cg_ctx.module(), triple, cpu, "", opt_level, &obj_path)?;
             link_executable(&obj_path, &exe_path)?;
-            let exe_size = std::fs::metadata(&exe_path).map(|m| m.len()).unwrap_or(size);
+            let exe_size = std::fs::metadata(&exe_path)
+                .map(|m| m.len())
+                .unwrap_or(size);
             Ok(CodegenOutput {
                 object_path: Some(obj_path),
                 executable_path: Some(exe_path),
@@ -203,12 +202,12 @@ pub fn emit_code(
 fn find_return_leaf(
     graph: &Graph,
 ) -> Result<Option<torc_core::graph::node::NodeId>, MaterializationError> {
-    let sorted = graph.topological_sort().map_err(|e| {
-        MaterializationError::CodegenFailed {
+    let sorted = graph
+        .topological_sort()
+        .map_err(|e| MaterializationError::CodegenFailed {
             stage: "find_return_leaf".into(),
             message: format!("topological sort failed: {e}"),
-        }
-    })?;
+        })?;
     for &node_id in sorted.iter().rev() {
         let outgoing = graph.outgoing_edges(&node_id);
         if outgoing.is_empty() {
@@ -245,9 +244,9 @@ fn build_function<'ctx>(
         None => llvm_ctx.void_type().fn_type(&[], false),
     };
 
-    let function = ctx
-        .module()
-        .add_function(&ctx.module().get_name().to_string_lossy(), fn_type, None);
+    let function =
+        ctx.module()
+            .add_function(&ctx.module().get_name().to_string_lossy(), fn_type, None);
     let entry = llvm_ctx.append_basic_block(function, "entry");
     ctx.builder().position_at_end(entry);
 
@@ -273,12 +272,12 @@ fn build_return<'ctx>(
     match last_leaf {
         Some(leaf_id) => {
             if let Some(val) = ctx.get_value(&leaf_id, 0) {
-                ctx.builder()
-                    .build_return(Some(&val))
-                    .map_err(|e| MaterializationError::CodegenFailed {
+                ctx.builder().build_return(Some(&val)).map_err(|e| {
+                    MaterializationError::CodegenFailed {
                         stage: "build_return".into(),
                         message: format!("failed to build return: {e}"),
-                    })?;
+                    }
+                })?;
             } else {
                 ctx.builder().build_return(None).map_err(|e| {
                     MaterializationError::CodegenFailed {
@@ -290,12 +289,12 @@ fn build_return<'ctx>(
         }
         None => {
             // Empty graph — void return
-            ctx.builder().build_return(None).map_err(|e| {
-                MaterializationError::CodegenFailed {
+            ctx.builder()
+                .build_return(None)
+                .map_err(|e| MaterializationError::CodegenFailed {
                     stage: "build_return".into(),
                     message: format!("failed to build void return: {e}"),
-                }
-            })?;
+                })?;
         }
     }
 
@@ -319,11 +318,9 @@ mod tests {
         let mut lit2 =
             Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
         lit2.annotations.insert("value".into(), "32".into());
-        let add = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add))
-            .with_type_signature(TypeSignature::new(
-                vec![Type::i32(), Type::i32()],
-                vec![Type::i32()],
-            ));
+        let add = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add)).with_type_signature(
+            TypeSignature::new(vec![Type::i32(), Type::i32()], vec![Type::i32()]),
+        );
 
         let id1 = g.add_node(lit1).unwrap();
         let id2 = g.add_node(lit2).unwrap();

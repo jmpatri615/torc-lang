@@ -134,20 +134,18 @@ fn build_for_target(
     // LLVM codegen modes
     #[cfg(feature = "llvm")]
     match emit_mode {
-        "llvm-ir" | "object" | "executable" => {
-            run_codegen(
-                trc.graph,
-                platform,
-                emit_mode,
-                release,
-                profile,
-                project_dir,
-                gate,
-            )
-        }
-        other => bail!(
-            "unknown emit mode: '{other}'. Choose: graph-stats, llvm-ir, object, executable"
+        "llvm-ir" | "object" | "executable" => run_codegen(
+            trc.graph,
+            platform,
+            emit_mode,
+            release,
+            profile,
+            project_dir,
+            gate,
         ),
+        other => {
+            bail!("unknown emit mode: '{other}'. Choose: graph-stats, llvm-ir, object, executable")
+        }
     }
     #[cfg(not(feature = "llvm"))]
     {
@@ -228,7 +226,11 @@ fn resolve_platforms(
     Ok(vec![Platform::generic_linux_x86_64()])
 }
 
-fn run_check_resources(graph: torc_core::graph::Graph, platform: Platform, gate: GateConfig) -> Result<()> {
+fn run_check_resources(
+    graph: torc_core::graph::Graph,
+    platform: Platform,
+    gate: GateConfig,
+) -> Result<()> {
     let config = PipelineConfig {
         platform,
         gate,
@@ -245,7 +247,11 @@ fn run_check_resources(graph: torc_core::graph::Graph, platform: Platform, gate:
     Ok(())
 }
 
-fn run_graph_stats(graph: torc_core::graph::Graph, platform: Platform, gate: GateConfig) -> Result<()> {
+fn run_graph_stats(
+    graph: torc_core::graph::Graph,
+    platform: Platform,
+    gate: GateConfig,
+) -> Result<()> {
     let config = PipelineConfig {
         platform,
         gate,
@@ -351,8 +357,7 @@ mod tests {
     #[test]
     fn resolve_platforms_cli_flag() {
         let dir = tempfile::tempdir().unwrap();
-        let platforms =
-            resolve_platforms(Some("linux-x86_64"), false, None, dir.path()).unwrap();
+        let platforms = resolve_platforms(Some("linux-x86_64"), false, None, dir.path()).unwrap();
         assert_eq!(platforms.len(), 1);
         assert_eq!(platforms[0].name, "linux-x86_64");
     }
@@ -369,8 +374,7 @@ default = "stm32f407-discovery"
 "#,
         )
         .unwrap();
-        let platforms =
-            resolve_platforms(None, false, Some(&manifest), dir.path()).unwrap();
+        let platforms = resolve_platforms(None, false, Some(&manifest), dir.path()).unwrap();
         assert_eq!(platforms.len(), 1);
         assert_eq!(platforms[0].name, "stm32f407-discovery");
     }
@@ -403,8 +407,7 @@ optimization = "minimal-size"
 "#,
         )
         .unwrap();
-        let platforms =
-            resolve_platforms(None, true, Some(&manifest), dir.path()).unwrap();
+        let platforms = resolve_platforms(None, true, Some(&manifest), dir.path()).unwrap();
         assert!(platforms.len() >= 2);
         assert!(platforms.iter().any(|p| p.name == "linux-x86_64"));
         assert!(platforms.iter().any(|p| p.name == "stm32f407-discovery"));

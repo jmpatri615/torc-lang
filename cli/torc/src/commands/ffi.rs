@@ -42,12 +42,12 @@ pub fn bridge_from_c(
         .map(|p| p.isa.word_size as u8)
         .unwrap_or(64);
 
-    let graph = torc_ffi::generate_bridge(&decl, word_bits)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let graph = torc_ffi::generate_bridge(&decl, word_bits).map_err(|e| anyhow::anyhow!("{e}"))?;
 
     // Serialize to TRC
     let trc_file = torc_trc::TrcFile::new(graph);
-    let trc_data = trc_file.to_bytes()
+    let trc_data = trc_file
+        .to_bytes()
         .with_context(|| "serializing bridge graph")?;
 
     // Write to graph/ffi/<library>.trc
@@ -70,18 +70,14 @@ pub fn bridge_from_c(
 ///
 /// Loads the main graph (or specified input), finds exported functions,
 /// and generates a C header file.
-pub fn bridge_to_c(
-    project_dir: &Path,
-    input: Option<&str>,
-    output: Option<&str>,
-) -> Result<()> {
+pub fn bridge_to_c(project_dir: &Path, input: Option<&str>, output: Option<&str>) -> Result<()> {
     let input_path = project_dir.join(input.unwrap_or("graph/main.trc"));
     if !input_path.is_file() {
         bail!("Input file not found: {}", input_path.display());
     }
 
-    let trc_data = std::fs::read(&input_path)
-        .with_context(|| format!("reading {}", input_path.display()))?;
+    let trc_data =
+        std::fs::read(&input_path).with_context(|| format!("reading {}", input_path.display()))?;
 
     let trc_file = torc_trc::TrcFile::from_bytes(&trc_data)
         .with_context(|| format!("deserializing {}", input_path.display()))?;
@@ -98,8 +94,8 @@ pub fn bridge_to_c(
         .and_then(|s| s.to_str())
         .unwrap_or("torc_exports");
 
-    let header = torc_ffi::generate_c_header(&graph, guard_name)
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let header =
+        torc_ffi::generate_c_header(&graph, guard_name).map_err(|e| anyhow::anyhow!("{e}"))?;
 
     // Write header
     if let Some(parent) = output_path.parent() {

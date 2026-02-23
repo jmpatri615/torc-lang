@@ -52,7 +52,11 @@ fn now_iso8601() -> String {
     let mut y = 1970i64;
     let mut remaining = days as i64;
     loop {
-        let year_days = if y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) { 366 } else { 365 };
+        let year_days = if y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) {
+            366
+        } else {
+            365
+        };
         if remaining < year_days {
             break;
         }
@@ -61,7 +65,18 @@ fn now_iso8601() -> String {
     }
     let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
     let month_days: [i64; 12] = [
-        31, if leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31,
+        31,
+        if leap { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
     ];
     let mut m = 0usize;
     while m < 12 && remaining >= month_days[m] {
@@ -70,7 +85,12 @@ fn now_iso8601() -> String {
     }
     format!(
         "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-        y, m + 1, remaining + 1, hours, minutes, seconds
+        y,
+        m + 1,
+        remaining + 1,
+        hours,
+        minutes,
+        seconds
     )
 }
 
@@ -134,9 +154,22 @@ mod tests {
         assert_eq!(t.from_state, DecisionState::Unexplored);
         assert_eq!(t.to_state, DecisionState::Exploring);
         // Timestamp should be a valid ISO 8601 string
-        assert!(t.timestamp.ends_with('Z'), "timestamp should end with Z: {}", t.timestamp);
-        assert!(t.timestamp.contains('T'), "timestamp should contain T: {}", t.timestamp);
-        assert_eq!(t.timestamp.len(), 20, "ISO 8601 UTC is 20 chars: {}", t.timestamp);
+        assert!(
+            t.timestamp.ends_with('Z'),
+            "timestamp should end with Z: {}",
+            t.timestamp
+        );
+        assert!(
+            t.timestamp.contains('T'),
+            "timestamp should contain T: {}",
+            t.timestamp
+        );
+        assert_eq!(
+            t.timestamp.len(),
+            20,
+            "ISO 8601 UTC is 20 chars: {}",
+            t.timestamp
+        );
     }
 
     #[test]
@@ -151,7 +184,10 @@ mod tests {
         .with_rationale("ADC alignment benefit discovered")
         .with_sequence(3);
 
-        assert_eq!(t.rationale.as_deref(), Some("ADC alignment benefit discovered"));
+        assert_eq!(
+            t.rationale.as_deref(),
+            Some("ADC alignment benefit discovered")
+        );
         assert_eq!(t.sequence, 3);
     }
 

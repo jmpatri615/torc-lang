@@ -213,11 +213,9 @@ mod tests {
         let n2 =
             Node::new(NodeKind::Literal).with_type_signature(TypeSignature::source(Type::i32()));
 
-        let consumer = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add))
-            .with_type_signature(TypeSignature::new(
-                vec![Type::i32(), Type::i32()],
-                vec![Type::i32()],
-            ));
+        let consumer = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add)).with_type_signature(
+            TypeSignature::new(vec![Type::i32(), Type::i32()], vec![Type::i32()]),
+        );
 
         let id1 = g.add_node(n1).unwrap();
         let id2 = g.add_node(n2).unwrap();

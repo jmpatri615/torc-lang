@@ -349,21 +349,11 @@ fn run(cli: Cli) -> anyhow::Result<()> {
                 let (manifest, project_dir) = load_manifest_optional(&cwd)?;
                 let project_dir = project_dir.unwrap_or(cwd);
                 if let Some(ffi_toml) = from_c {
-                    commands::ffi::bridge_from_c(
-                        &project_dir,
-                        manifest.as_ref(),
-                        &ffi_toml,
-                    )
+                    commands::ffi::bridge_from_c(&project_dir, manifest.as_ref(), &ffi_toml)
                 } else if to_c {
-                    commands::ffi::bridge_to_c(
-                        &project_dir,
-                        input.as_deref(),
-                        output.as_deref(),
-                    )
+                    commands::ffi::bridge_to_c(&project_dir, input.as_deref(), output.as_deref())
                 } else {
-                    anyhow::bail!(
-                        "specify --from-c <file.ffi.toml> or --to-c"
-                    )
+                    anyhow::bail!("specify --from-c <file.ffi.toml> or --to-c")
                 }
             }
         },
@@ -410,11 +400,7 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             DecisionAction::List { state, domain } => {
                 let (_, project_dir) = load_manifest_optional(&cwd)?;
                 let project_dir = project_dir.unwrap_or(cwd);
-                commands::decision::list(
-                    &project_dir,
-                    state.as_deref(),
-                    domain.as_deref(),
-                )
+                commands::decision::list(&project_dir, state.as_deref(), domain.as_deref())
             }
             DecisionAction::Show { id } => {
                 let (_, project_dir) = load_manifest_optional(&cwd)?;
@@ -428,12 +414,7 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             } => {
                 let (_, project_dir) = load_manifest_optional(&cwd)?;
                 let project_dir = project_dir.unwrap_or(cwd);
-                commands::decision::commit(
-                    &project_dir,
-                    &id,
-                    &value,
-                    rationale.as_deref(),
-                )
+                commands::decision::commit(&project_dir, &id, &value, rationale.as_deref())
             }
             DecisionAction::Defer {
                 id,
@@ -461,21 +442,14 @@ fn run(cli: Cli) -> anyhow::Result<()> {
             } => {
                 let (_, project_dir) = load_manifest_optional(&cwd)?;
                 let project_dir = project_dir.unwrap_or(cwd);
-                commands::decision::add(
-                    &project_dir,
-                    &title,
-                    &domain,
-                    description.as_deref(),
-                )
+                commands::decision::add(&project_dir, &title, &domain, description.as_deref())
             }
         },
     }
 }
 
 /// Load manifest, returning error if not found.
-fn load_manifest_required(
-    cwd: &Path,
-) -> anyhow::Result<(TorcManifest, PathBuf)> {
+fn load_manifest_required(cwd: &Path) -> anyhow::Result<(TorcManifest, PathBuf)> {
     match TorcManifest::find_and_load(cwd)? {
         Some((manifest, dir)) => Ok((manifest, dir)),
         None => anyhow::bail!("no torc.toml found (run `torc init` first)"),
@@ -483,9 +457,7 @@ fn load_manifest_required(
 }
 
 /// Try to load a manifest from the current directory upward. Returns (None, None) if not found.
-fn load_manifest_optional(
-    cwd: &Path,
-) -> anyhow::Result<(Option<TorcManifest>, Option<PathBuf>)> {
+fn load_manifest_optional(cwd: &Path) -> anyhow::Result<(Option<TorcManifest>, Option<PathBuf>)> {
     match TorcManifest::find_and_load(cwd)? {
         Some((manifest, dir)) => Ok((Some(manifest), Some(dir))),
         None => Ok((None, None)),
@@ -508,8 +480,7 @@ mod integration_tests {
         assert!(project_path.join("graph/main.trc").is_file());
 
         // 2. Verify — load manifest and graph, run verification
-        let (manifest, project_dir) =
-            TorcManifest::find_and_load(&project_path).unwrap().unwrap();
+        let (manifest, project_dir) = TorcManifest::find_and_load(&project_path).unwrap().unwrap();
         assert_eq!(project_dir, project_path);
         commands::verify::run(
             &project_path,
@@ -571,16 +542,7 @@ mod integration_tests {
         let project_path = dir.path().join("status-test");
         commands::init::create_project(&project_path, "status-test").unwrap();
 
-        commands::verify::run(
-            &project_path,
-            None,
-            None,
-            true,
-            None,
-            None,
-            false,
-        )
-        .unwrap();
+        commands::verify::run(&project_path, None, None, true, None, None, false).unwrap();
     }
 
     /// FFI bridge-from-c workflow: .ffi.toml → bridge graph → .trc file.
@@ -651,12 +613,7 @@ trust_level = "platform"
         std::fs::write(project_path.join("graph/main.trc"), &data).unwrap();
 
         // Run bridge-to-c
-        commands::ffi::bridge_to_c(
-            &project_path,
-            None,
-            Some("include/exports.h"),
-        )
-        .unwrap();
+        commands::ffi::bridge_to_c(&project_path, None, Some("include/exports.h")).unwrap();
 
         let header_path = project_path.join("include/exports.h");
         assert!(header_path.is_file(), "C header should exist");
@@ -698,15 +655,11 @@ trust_level = "unsafe"
 "#;
         std::fs::write(project_path.join("danger.ffi.toml"), ffi_toml).unwrap();
 
-        let (manifest, _) =
-            TorcManifest::find_and_load(&project_path).unwrap().unwrap();
+        let (manifest, _) = TorcManifest::find_and_load(&project_path).unwrap().unwrap();
 
         // Should fail due to policy
-        let result = commands::ffi::bridge_from_c(
-            &project_path,
-            Some(&manifest),
-            "danger.ffi.toml",
-        );
+        let result =
+            commands::ffi::bridge_from_c(&project_path, Some(&manifest), "danger.ffi.toml");
         assert!(result.is_err(), "unsafe should be rejected by policy");
     }
 
@@ -770,7 +723,10 @@ reject-unsigned = true
 "#;
         let manifest = TorcManifest::from_str(toml_str).unwrap();
         let reg = manifest.registry.unwrap();
-        assert_eq!(reg.publish_to.as_deref(), Some("https://registry.torc-lang.org"));
+        assert_eq!(
+            reg.publish_to.as_deref(),
+            Some("https://registry.torc-lang.org")
+        );
         assert_eq!(reg.local_path.as_deref(), Some(".torc-registry"));
         assert_eq!(reg.reject_unsigned, Some(true));
     }
@@ -850,15 +806,11 @@ platform_trusted = ["libm", "libc"]
             "PWM Frequency",
             "performance",
             Some("Select the PWM switching frequency"),
-        ).unwrap();
+        )
+        .unwrap();
 
         // Add another
-        commands::decision::add(
-            &project_path,
-            "Control topology",
-            "topology",
-            None,
-        ).unwrap();
+        commands::decision::add(&project_path, "Control topology", "topology", None).unwrap();
 
         // List should show 2
         commands::decision::list(&project_path, None, None).unwrap();
@@ -880,7 +832,8 @@ platform_trusted = ["libm", "libc"]
             "Safety Mode",
             "safety",
             Some("Define safe state behavior"),
-        ).unwrap();
+        )
+        .unwrap();
 
         // Load graph to get the decision ID prefix
         let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
@@ -900,12 +853,7 @@ platform_trusted = ["libm", "libc"]
         commands::init::create_project(&project_path, "decision-commit").unwrap();
         commands::decision::init(&project_path).unwrap();
 
-        commands::decision::add(
-            &project_path,
-            "Control Loop Rate",
-            "performance",
-            None,
-        ).unwrap();
+        commands::decision::add(&project_path, "Control Loop Rate", "performance", None).unwrap();
 
         // Get the decision ID
         let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
@@ -914,12 +862,8 @@ platform_trusted = ["libm", "libc"]
         let id_prefix = &decision.id.to_string()[..8];
 
         // Commit should succeed
-        commands::decision::commit(
-            &project_path,
-            id_prefix,
-            "20kHz",
-            Some("Standard FOC rate"),
-        ).unwrap();
+        commands::decision::commit(&project_path, id_prefix, "20kHz", Some("Standard FOC rate"))
+            .unwrap();
 
         // Verify the state persisted as COMMITTED
         let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
@@ -936,12 +880,8 @@ platform_trusted = ["libm", "libc"]
         commands::init::create_project(&project_path, "decision-defer").unwrap();
         commands::decision::init(&project_path).unwrap();
 
-        commands::decision::add(
-            &project_path,
-            "CAN Protocol Version",
-            "communication",
-            None,
-        ).unwrap();
+        commands::decision::add(&project_path, "CAN Protocol Version", "communication", None)
+            .unwrap();
 
         let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
         let tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
@@ -949,12 +889,7 @@ platform_trusted = ["libm", "libc"]
         let id_prefix = &decision.id.to_string()[..8];
 
         // Defer with provisional value
-        commands::decision::defer(
-            &project_path,
-            id_prefix,
-            Some("CAN 2.0B"),
-            None,
-        ).unwrap();
+        commands::decision::defer(&project_path, id_prefix, Some("CAN 2.0B"), None).unwrap();
 
         // Verify state persisted as DEFERRED
         let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
@@ -989,9 +924,11 @@ platform_trusted = ["libm", "libc"]
         // Verify via graph: exactly 1 committed, 1 unexplored
         let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
         let tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
-        let committed: Vec<_> = tdg.graph
+        let committed: Vec<_> = tdg
+            .graph
             .decisions_by_state(torc_spec::DecisionState::Committed);
-        let unexplored: Vec<_> = tdg.graph
+        let unexplored: Vec<_> = tdg
+            .graph
             .decisions_by_state(torc_spec::DecisionState::Unexplored);
         assert_eq!(committed.len(), 1, "should have 1 committed decision");
         assert_eq!(unexplored.len(), 1, "should have 1 unexplored decision");
@@ -1005,16 +942,7 @@ platform_trusted = ["libm", "libc"]
         commands::init::create_project(&project_path, "verify-no-tdg").unwrap();
 
         // No decisions.tdg — verify should work exactly as before
-        commands::verify::run(
-            &project_path,
-            None,
-            None,
-            false,
-            None,
-            None,
-            false,
-        )
-        .unwrap();
+        commands::verify::run(&project_path, None, None, false, None, None, false).unwrap();
     }
 
     /// Verify with TDG present — profile upgrade note.
@@ -1026,35 +954,26 @@ platform_trusted = ["libm", "libc"]
 
         // Create a TDG with a tentative decision
         commands::decision::init(&project_path).unwrap();
-        commands::decision::add(
-            &project_path, "Control method", "topology", None,
-        ).unwrap();
+        commands::decision::add(&project_path, "Control method", "topology", None).unwrap();
 
         // Get the decision ID and transition to Tentative
         let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
         let mut tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
         let decision = tdg.graph.decisions().next().unwrap();
         let id = decision.id;
-        tdg.graph.transition(
-            id,
-            torc_spec::DecisionState::Tentative,
-            torc_spec::DecisionValue::Provisional("FOC".into()),
-            None,
-        ).unwrap();
+        tdg.graph
+            .transition(
+                id,
+                torc_spec::DecisionState::Tentative,
+                torc_spec::DecisionValue::Provisional("FOC".into()),
+                None,
+            )
+            .unwrap();
         let bytes = torc_spec::TdgFile::new(tdg.graph).to_bytes().unwrap();
         std::fs::write(project_path.join("spec/decisions.tdg"), bytes).unwrap();
 
         // Verify should succeed — profile is upgraded but no error
-        commands::verify::run(
-            &project_path,
-            None,
-            None,
-            false,
-            None,
-            None,
-            false,
-        )
-        .unwrap();
+        commands::verify::run(&project_path, None, None, false, None, None, false).unwrap();
     }
 
     /// Build blocks on conflicted decisions.
@@ -1066,27 +985,29 @@ platform_trusted = ["libm", "libc"]
 
         // Create a TDG with a conflicted decision
         commands::decision::init(&project_path).unwrap();
-        commands::decision::add(
-            &project_path, "Bus protocol", "comms", None,
-        ).unwrap();
+        commands::decision::add(&project_path, "Bus protocol", "comms", None).unwrap();
 
         let tdg_data = std::fs::read(project_path.join("spec/decisions.tdg")).unwrap();
         let mut tdg = torc_spec::TdgFile::from_bytes(&tdg_data).unwrap();
         let decision = tdg.graph.decisions().next().unwrap();
         let id = decision.id;
         // Unexplored → Exploring → Conflicted (valid path)
-        tdg.graph.transition(
-            id,
-            torc_spec::DecisionState::Exploring,
-            torc_spec::DecisionValue::Unresolved,
-            None,
-        ).unwrap();
-        tdg.graph.transition(
-            id,
-            torc_spec::DecisionState::Conflicted,
-            torc_spec::DecisionValue::Unresolved,
-            None,
-        ).unwrap();
+        tdg.graph
+            .transition(
+                id,
+                torc_spec::DecisionState::Exploring,
+                torc_spec::DecisionValue::Unresolved,
+                None,
+            )
+            .unwrap();
+        tdg.graph
+            .transition(
+                id,
+                torc_spec::DecisionState::Conflicted,
+                torc_spec::DecisionValue::Unresolved,
+                None,
+            )
+            .unwrap();
         let bytes = torc_spec::TdgFile::new(tdg.graph).to_bytes().unwrap();
         std::fs::write(project_path.join("spec/decisions.tdg"), bytes).unwrap();
 
@@ -1102,7 +1023,10 @@ platform_trusted = ["libm", "libc"]
             None,
             false,
         );
-        assert!(result.is_err(), "build should be blocked by conflicted decisions");
+        assert!(
+            result.is_err(),
+            "build should be blocked by conflicted decisions"
+        );
     }
 
     /// Build warns on unexplored safety decisions but doesn't block.
@@ -1114,9 +1038,7 @@ platform_trusted = ["libm", "libc"]
 
         // Create a TDG with an unexplored safety decision
         commands::decision::init(&project_path).unwrap();
-        commands::decision::add(
-            &project_path, "Safety monitor", "safety", None,
-        ).unwrap();
+        commands::decision::add(&project_path, "Safety monitor", "safety", None).unwrap();
 
         // Build should succeed (warning only, no block)
         commands::build::run(
@@ -1129,7 +1051,8 @@ platform_trusted = ["libm", "libc"]
             None,
             None,
             false,
-        ).unwrap();
+        )
+        .unwrap();
     }
 
     /// Inspect --view decision dispatches correctly.
@@ -1141,18 +1064,10 @@ platform_trusted = ["libm", "libc"]
 
         // Create decisions.tdg
         commands::decision::init(&project_path).unwrap();
-        commands::decision::add(
-            &project_path, "PWM freq", "performance", None,
-        ).unwrap();
+        commands::decision::add(&project_path, "PWM freq", "performance", None).unwrap();
 
         // inspect --view decision should succeed
-        commands::inspect::run(
-            &project_path,
-            Some("decision"),
-            None,
-            None,
-            None,
-        ).unwrap();
+        commands::inspect::run(&project_path, Some("decision"), None, None, None).unwrap();
     }
 
     /// Inspect --view decision with no TDG prints helpful message.
@@ -1163,13 +1078,7 @@ platform_trusted = ["libm", "libc"]
         commands::init::create_project(&project_path, "inspect-no-tdg").unwrap();
 
         // No decisions.tdg — should not error, just print helpful message
-        commands::inspect::run(
-            &project_path,
-            Some("decision"),
-            None,
-            None,
-            None,
-        ).unwrap();
+        commands::inspect::run(&project_path, Some("decision"), None, None, None).unwrap();
     }
 
     /// Decision: commit records history with timestamp.

@@ -94,28 +94,40 @@ pub fn ctype_string_from_torc(ty: &Type) -> String {
         Type::Void => "void".to_string(),
         Type::Unit => "void".to_string(),
         Type::Bool => "_Bool".to_string(),
-        Type::Int { width: 8, signedness } => {
+        Type::Int {
+            width: 8,
+            signedness,
+        } => {
             if matches!(signedness, torc_core::types::Signedness::Unsigned) {
                 "uint8_t".to_string()
             } else {
                 "int8_t".to_string()
             }
         }
-        Type::Int { width: 16, signedness } => {
+        Type::Int {
+            width: 16,
+            signedness,
+        } => {
             if matches!(signedness, torc_core::types::Signedness::Unsigned) {
                 "uint16_t".to_string()
             } else {
                 "int16_t".to_string()
             }
         }
-        Type::Int { width: 32, signedness } => {
+        Type::Int {
+            width: 32,
+            signedness,
+        } => {
             if matches!(signedness, torc_core::types::Signedness::Unsigned) {
                 "uint32_t".to_string()
             } else {
                 "int32_t".to_string()
             }
         }
-        Type::Int { width: 64, signedness } => {
+        Type::Int {
+            width: 64,
+            signedness,
+        } => {
             if matches!(signedness, torc_core::types::Signedness::Unsigned) {
                 "uint64_t".to_string()
             } else {
@@ -156,12 +168,30 @@ pub fn ctype_string_from_torc(ty: &Type) -> String {
 /// Select the appropriate marshal strategy for a C type.
 pub fn select_strategy(ct: &CType) -> MarshalStrategy {
     match ct {
-        CType::Void | CType::Char | CType::SignedChar | CType::UnsignedChar
-        | CType::Short | CType::UnsignedShort | CType::Int | CType::UnsignedInt
-        | CType::Long | CType::UnsignedLong | CType::LongLong | CType::UnsignedLongLong
-        | CType::Float | CType::Double | CType::LongDouble | CType::Bool
-        | CType::Int8 | CType::Int16 | CType::Int32 | CType::Int64
-        | CType::UInt8 | CType::UInt16 | CType::UInt32 | CType::UInt64
+        CType::Void
+        | CType::Char
+        | CType::SignedChar
+        | CType::UnsignedChar
+        | CType::Short
+        | CType::UnsignedShort
+        | CType::Int
+        | CType::UnsignedInt
+        | CType::Long
+        | CType::UnsignedLong
+        | CType::LongLong
+        | CType::UnsignedLongLong
+        | CType::Float
+        | CType::Double
+        | CType::LongDouble
+        | CType::Bool
+        | CType::Int8
+        | CType::Int16
+        | CType::Int32
+        | CType::Int64
+        | CType::UInt8
+        | CType::UInt16
+        | CType::UInt32
+        | CType::UInt64
         | CType::SizeT => MarshalStrategy::Direct,
 
         CType::Pointer(inner) => match inner.as_ref() {
@@ -186,18 +216,33 @@ mod tests {
     #[test]
     fn map_primitives() {
         assert_eq!(torc_type_from_ctype(&CType::Int, 64).unwrap(), Type::i32());
-        assert_eq!(torc_type_from_ctype(&CType::Float, 64).unwrap(), Type::f32());
-        assert_eq!(torc_type_from_ctype(&CType::Double, 64).unwrap(), Type::f64());
+        assert_eq!(
+            torc_type_from_ctype(&CType::Float, 64).unwrap(),
+            Type::f32()
+        );
+        assert_eq!(
+            torc_type_from_ctype(&CType::Double, 64).unwrap(),
+            Type::f64()
+        );
         assert_eq!(torc_type_from_ctype(&CType::Char, 64).unwrap(), Type::i8());
         assert_eq!(torc_type_from_ctype(&CType::Bool, 64).unwrap(), Type::Bool);
     }
 
     #[test]
     fn map_stdint() {
-        assert_eq!(torc_type_from_ctype(&CType::Int32, 64).unwrap(), Type::i32());
+        assert_eq!(
+            torc_type_from_ctype(&CType::Int32, 64).unwrap(),
+            Type::i32()
+        );
         assert_eq!(torc_type_from_ctype(&CType::UInt8, 64).unwrap(), Type::u8());
-        assert_eq!(torc_type_from_ctype(&CType::Int64, 64).unwrap(), Type::i64());
-        assert_eq!(torc_type_from_ctype(&CType::UInt16, 64).unwrap(), Type::u16());
+        assert_eq!(
+            torc_type_from_ctype(&CType::Int64, 64).unwrap(),
+            Type::i64()
+        );
+        assert_eq!(
+            torc_type_from_ctype(&CType::UInt16, 64).unwrap(),
+            Type::u16()
+        );
     }
 
     #[test]
@@ -221,8 +266,14 @@ mod tests {
 
     #[test]
     fn map_size_t_by_platform() {
-        assert_eq!(torc_type_from_ctype(&CType::SizeT, 64).unwrap(), Type::u64());
-        assert_eq!(torc_type_from_ctype(&CType::SizeT, 32).unwrap(), Type::u32());
+        assert_eq!(
+            torc_type_from_ctype(&CType::SizeT, 64).unwrap(),
+            Type::u64()
+        );
+        assert_eq!(
+            torc_type_from_ctype(&CType::SizeT, 32).unwrap(),
+            Type::u32()
+        );
     }
 
     #[test]
@@ -243,7 +294,9 @@ mod tests {
             MarshalStrategy::OpaquePointer
         );
         assert_eq!(
-            select_strategy(&CType::Pointer(Box::new(CType::Const(Box::new(CType::Char))))),
+            select_strategy(&CType::Pointer(Box::new(CType::Const(Box::new(
+                CType::Char
+            ))))),
             MarshalStrategy::StringToNullTerminated
         );
         assert_eq!(

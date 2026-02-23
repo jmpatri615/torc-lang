@@ -158,8 +158,7 @@ mod tests {
     #[test]
     fn assumption_supports_decisions() {
         let d_id = Uuid::new_v4();
-        let a = Assumption::new("test", Confidence::High, ImpactLevel::Low)
-            .supports(d_id);
+        let a = Assumption::new("test", Confidence::High, ImpactLevel::Low).supports(d_id);
         assert_eq!(a.supports_decisions, vec![d_id]);
     }
 

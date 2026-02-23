@@ -151,7 +151,12 @@ pub fn critical_path_length(graph: &Graph) -> Result<usize, MaterializationError
     }
 
     let levels = compute_levels(graph, &sorted);
-    Ok(levels.values().copied().max().unwrap_or(0).saturating_add(1))
+    Ok(levels
+        .values()
+        .copied()
+        .max()
+        .unwrap_or(0)
+        .saturating_add(1))
 }
 
 #[cfg(test)]
@@ -202,11 +207,9 @@ mod tests {
             .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
         let right = Node::new(NodeKind::Arithmetic(ArithmeticOp::Mul))
             .with_type_signature(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
-        let join = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add))
-            .with_type_signature(TypeSignature::new(
-                vec![Type::i32(), Type::i32()],
-                vec![Type::i32()],
-            ));
+        let join = Node::new(NodeKind::Arithmetic(ArithmeticOp::Add)).with_type_signature(
+            TypeSignature::new(vec![Type::i32(), Type::i32()], vec![Type::i32()]),
+        );
 
         let s = g.add_node(src).unwrap();
         let l = g.add_node(left).unwrap();

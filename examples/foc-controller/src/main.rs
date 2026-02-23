@@ -47,7 +47,9 @@ fn main() {
     println!("  regions: {}", graph.region_count());
 
     // Verify topological sort succeeds
-    let topo = graph.topological_sort().expect("graph has unexpected cycles");
+    let topo = graph
+        .topological_sort()
+        .expect("graph has unexpected cycles");
     println!("  topo order: {} nodes (DAG verified)", topo.len());
 
     // Serialize to TRC

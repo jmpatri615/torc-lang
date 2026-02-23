@@ -163,7 +163,7 @@ mod tests {
     use torc_core::contract::{Contract, ObligationKind, ProofStatus};
     use torc_core::graph::edge::Edge;
     use torc_core::graph::node::{Node, NodeKind};
-    use torc_core::types::{Predicate, TypeSignature, Type};
+    use torc_core::types::{Predicate, Type, TypeSignature};
 
     fn make_graph_with_obligations() -> Graph {
         let mut g = Graph::new();
@@ -178,10 +178,7 @@ mod tests {
         let mut n2 = Node::new(NodeKind::Arithmetic(
             torc_core::graph::node::ArithmeticOp::Add,
         ));
-        n2.type_signature = Some(TypeSignature::pure_fn(
-            vec![Type::i32()],
-            Type::i32(),
-        ));
+        n2.type_signature = Some(TypeSignature::pure_fn(vec![Type::i32()], Type::i32()));
         n2.contract = Some(Contract::with_conditions(
             vec![Predicate::positive("input")],
             vec![],

@@ -75,7 +75,7 @@ mod tests {
     #[test]
     fn lifetime_variants() {
         let region_id = uuid::Uuid::new_v4();
-        let lifetimes = vec![
+        let lifetimes = [
             Lifetime::Region(region_id),
             Lifetime::Static,
             Lifetime::Manual,
@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn constraint_variants() {
-        let constraints = vec![
+        let constraints = [
             Constraint::MaxTime(50_000),
             Constraint::MaxMemory(1024),
             Constraint::MaxEnergy(100),

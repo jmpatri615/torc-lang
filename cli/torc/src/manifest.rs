@@ -196,9 +196,7 @@ impl TorcManifest {
 
     /// Resolve the default target name from the manifest.
     pub fn default_target(&self) -> Option<&str> {
-        self.targets
-            .as_ref()
-            .and_then(|t| t.default.as_deref())
+        self.targets.as_ref().and_then(|t| t.default.as_deref())
     }
 
     /// Resolve the decisions.tdg path from the manifest (or use default).
@@ -259,10 +257,7 @@ pub fn resolve_target(name: &str, project_dir: Option<&Path>) -> Option<torc_tar
             match torc_targets::load_platform_toml(&target_path) {
                 Ok(platform) => return Some(platform),
                 Err(e) => {
-                    eprintln!(
-                        "warning: failed to parse {}: {e}",
-                        target_path.display()
-                    );
+                    eprintln!("warning: failed to parse {}: {e}", target_path.display());
                 }
             }
         }
@@ -326,10 +321,7 @@ publish_to = "https://registry.torc-lang.org"
         assert_eq!(manifest.project.safety.as_deref(), Some("ASIL-B"));
         assert_eq!(manifest.dependencies.len(), 2);
         assert_eq!(manifest.default_target(), Some("linux-x86_64"));
-        assert_eq!(
-            manifest.default_verification_profile(),
-            Some("integration")
-        );
+        assert_eq!(manifest.default_verification_profile(), Some("integration"));
         assert!(manifest.ffi.is_some());
         let reg = manifest.registry.as_ref().unwrap();
         assert_eq!(
@@ -365,10 +357,7 @@ optimization = "minimal-size"
 enforce_resources = true
 "#;
         let manifest = TorcManifest::from_str(toml_str).unwrap();
-        assert_eq!(
-            manifest.default_target(),
-            Some("stm32f407-discovery")
-        );
+        assert_eq!(manifest.default_target(), Some("stm32f407-discovery"));
         let platforms = &manifest.targets.as_ref().unwrap().platforms;
         assert!(platforms.contains_key("stm32f407-discovery"));
     }
@@ -393,10 +382,7 @@ enforce_resources = true
         assert_eq!(manifest.project.name, "test-project");
         assert_eq!(manifest.project.version, "0.1.0");
         assert_eq!(manifest.default_target(), Some("linux-x86_64"));
-        assert_eq!(
-            manifest.default_verification_profile(),
-            Some("development")
-        );
+        assert_eq!(manifest.default_verification_profile(), Some("development"));
     }
 
     #[test]

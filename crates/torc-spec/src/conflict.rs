@@ -11,10 +11,7 @@ use crate::graph::DecisionGraph;
 /// Check for circular dependencies starting from a decision.
 ///
 /// Returns the cycle path if a circular dependency is found.
-pub fn check_circular_deps(
-    graph: &DecisionGraph,
-    start: DecisionId,
-) -> Result<(), SpecError> {
+pub fn check_circular_deps(graph: &DecisionGraph, start: DecisionId) -> Result<(), SpecError> {
     let mut visited = HashSet::new();
     let mut stack = HashSet::new();
 

@@ -20,6 +20,9 @@ pub mod impact;
 pub mod serialize;
 
 pub use assumption::{Assumption, AssumptionId, Confidence, ImpactLevel};
+pub use bridge::{
+    check_materialization_readiness, decision_aware_profile, ReadinessIssue, Severity,
+};
 pub use conflict::{blocking_decisions, check_circular_deps, find_conflicts};
 pub use decision::{
     verification_mode, Decision, DecisionId, DecisionState, DecisionValue, RevisitTrigger,
@@ -31,5 +34,4 @@ pub use history::StateTransition;
 pub use impact::{
     analyze_commit_impact, Concern, ConcernSeverity, DerivedConsequence, Exclusion, ImpactReport,
 };
-pub use bridge::{check_materialization_readiness, decision_aware_profile, ReadinessIssue, Severity};
 pub use serialize::TdgFile;

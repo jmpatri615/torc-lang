@@ -56,9 +56,7 @@ pub fn emit_object(
             message: format!("failed to write object file: {e}"),
         })?;
 
-    let size = std::fs::metadata(output_path)
-        .map(|m| m.len())
-        .unwrap_or(0);
+    let size = std::fs::metadata(output_path).map(|m| m.len()).unwrap_or(0);
 
     Ok(size)
 }
@@ -73,10 +71,7 @@ pub fn emit_bitcode(module: &Module<'_>, output_path: &Path) -> Result<(), Mater
     if !module.write_bitcode_to_path(output_path) {
         return Err(MaterializationError::CodegenFailed {
             stage: "emit_bitcode".into(),
-            message: format!(
-                "failed to write bitcode to {}",
-                output_path.display()
-            ),
+            message: format!("failed to write bitcode to {}", output_path.display()),
         });
     }
     Ok(())
@@ -85,10 +80,7 @@ pub fn emit_bitcode(module: &Module<'_>, output_path: &Path) -> Result<(), Mater
 /// Link an object file into an executable using the system C compiler.
 ///
 /// Invokes `cc -o <output> <object>` to produce a linked ELF binary.
-pub fn link_executable(
-    object_path: &Path,
-    output_path: &Path,
-) -> Result<(), MaterializationError> {
+pub fn link_executable(object_path: &Path, output_path: &Path) -> Result<(), MaterializationError> {
     let status = std::process::Command::new("cc")
         .arg("-o")
         .arg(output_path)
@@ -214,10 +206,7 @@ mod tests {
             platform_triple("generic-linux-x86_64"),
             "x86_64-unknown-linux-gnu"
         );
-        assert_eq!(
-            platform_triple("linux-x86_64"),
-            "x86_64-unknown-linux-gnu"
-        );
+        assert_eq!(platform_triple("linux-x86_64"), "x86_64-unknown-linux-gnu");
     }
 
     #[test]

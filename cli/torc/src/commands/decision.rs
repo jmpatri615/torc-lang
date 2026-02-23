@@ -30,10 +30,7 @@ pub fn load_tdg_optional(project_dir: &Path) -> Option<DecisionGraph> {
             }
         },
         Err(e) => {
-            eprintln!(
-                "warning: could not read {} — {e}",
-                tdg_path.display()
-            );
+            eprintln!("warning: could not read {} — {e}", tdg_path.display());
             None
         }
     }
@@ -48,10 +45,9 @@ fn load_tdg(project_dir: &Path) -> anyhow::Result<(DecisionGraph, std::path::Pat
             tdg_path.display()
         );
     }
-    let data = std::fs::read(&tdg_path)
-        .with_context(|| format!("reading {}", tdg_path.display()))?;
-    let tdg = TdgFile::from_bytes(&data)
-        .map_err(|e| anyhow::anyhow!("invalid TDG file: {e}"))?;
+    let data =
+        std::fs::read(&tdg_path).with_context(|| format!("reading {}", tdg_path.display()))?;
+    let tdg = TdgFile::from_bytes(&data).map_err(|e| anyhow::anyhow!("invalid TDG file: {e}"))?;
     Ok((tdg.graph, tdg_path))
 }
 
@@ -59,8 +55,7 @@ fn load_tdg(project_dir: &Path) -> anyhow::Result<(DecisionGraph, std::path::Pat
 fn save_tdg(graph: &DecisionGraph, path: &Path) -> anyhow::Result<()> {
     let tdg = TdgFile::new(graph.clone());
     let bytes = tdg.to_bytes().map_err(|e| anyhow::anyhow!("{e}"))?;
-    std::fs::write(path, bytes)
-        .with_context(|| format!("writing {}", path.display()))?;
+    std::fs::write(path, bytes).with_context(|| format!("writing {}", path.display()))?;
     Ok(())
 }
 
@@ -296,9 +291,9 @@ pub fn status(project_dir: &Path) -> anyhow::Result<()> {
     println!("  ─────────────────");
     println!("  Total:       {:>3}", summary.total);
     println!();
-    println!("Assumptions: {} ({} unacknowledged)",
-        summary.assumptions_total,
-        summary.assumptions_unacknowledged,
+    println!(
+        "Assumptions: {} ({} unacknowledged)",
+        summary.assumptions_total, summary.assumptions_unacknowledged,
     );
 
     Ok(())
